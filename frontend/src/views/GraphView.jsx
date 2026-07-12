@@ -38,6 +38,7 @@ const COL_W = 236
 const ROW = 26
 const PAD = { x: 40, y: 30 }
 const LABEL_W = 200
+const HEAD_H = 30
 
 const RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, MINIMAL: 4, NONE: 5 }
 const rank = (b) => (RANK[b] === undefined ? 5 : RANK[b])
@@ -152,7 +153,7 @@ export default function GraphView({ summary, cve }) {
 
     return {
       nodes, links, dia, chain, traced, counts, maxD,
-      h: PAD.y * 2 + cursor * ROW,
+      h: PAD.y + Math.max(0, cursor - 1) * ROW + PAD.y,
       app: appNode.data,
       dropped: showClean ? 0 : allLibs - counts.total,
     }
@@ -187,10 +188,12 @@ export default function GraphView({ summary, cve }) {
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={appId} onChange={(e) => setAppId(e.target.value)}
-              className="h-8 rounded-lg border border-line bg-raised px-2 text-xs text-ink outline-none focus:border-amber/60"
+              className="h-8 w-[190px] rounded-lg border border-line bg-raised px-2.5 text-xs text-ink outline-none focus:border-amber/60"
             >
               {summary.applications.map((a) => (
-                <option key={a.app_id} value={a.app_id}>{a.name}</option>
+                <option key={a.app_id} value={a.app_id}>
+                  {a.app_name} — {a.at_risk_count} at risk
+                </option>
               ))}
             </select>
             <Field
@@ -238,14 +241,15 @@ export default function GraphView({ summary, cve }) {
             ) : (
               <div
                 className="relative overflow-hidden bg-deep/40"
-                style={{ height: Math.min(880, Math.max(360, L.h + 56)), cursor: drag.current ? 'grabbing' : 'grab' }}
+                style={{ height: HEAD_H + 10 + L.h + 14, cursor: drag.current ? 'grabbing' : 'grab' }}
                 onWheel={onWheel} onMouseDown={down} onMouseMove={move}
                 onMouseUp={up} onMouseLeave={() => { up(); setHover(null) }}
               >
-                {/* the column headers carry the meaning, so they stay put while you pan */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex border-b border-line bg-surface/85 backdrop-blur">
+                {/* Headers ride the SAME transform as the nodes. Anything else drifts. */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[30px] overflow-hidden border-b border-line bg-surface/85 backdrop-blur">
                   {Array.from({ length: L.maxD + 1 }, (_, d) => (
-                    <div key={d} className="shrink-0 border-r border-line/60 px-3 py-2" style={{ width: COL_W }}>
+                    <div key={d} className="absolute top-0 whitespace-nowrap py-2"
+                      style={{ left: view.x + (PAD.x - 22 + d * COL_W) * view.k }}>
                       <span className="label text-[9.5px] text-faint">
                         {d === 0 ? 'the application' : d === 1 ? 'you chose this' : `hop ${d} · uninvited`}
                       </span>
@@ -261,7 +265,13 @@ export default function GraphView({ summary, cve }) {
                     </filter>
                   </defs>
 
-                  <g transform={`translate(${view.x},${view.y + 36}) scale(${view.k})`}>
+                  <g transform={`translate(${view.x},${view.y + HEAD_H + 10}) scale(${view.k})`}>
+                    {/* one band per hop, so a column is a place and not just a coincidence */}
+                    {Array.from({ length: L.maxD + 1 }, (_, d) => (
+                      <rect key={'b' + d} x={PAD.x - 22 + d * COL_W} y={-6} width={COL_W - 8} height={L.h}
+                        rx={10} fill={d === 0 ? '#ff7a3d' : '#fffaf0'} opacity={d === 0 ? 0.035 : 0.015} />
+                    ))}
+
                     {/* the routes the spanning tree could not draw */}
                     {L.dia.map((e) => (
                       <path key={e.key} d={edge(e.from, e.to)} fill="none" stroke="#847c6f"
