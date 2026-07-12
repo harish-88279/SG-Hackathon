@@ -1,0 +1,15 @@
+# Keep the image small and the build fast.
+
+.git/
+.github/
+frontend/node_modules/
+frontend/dist/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.venv/
+venv/
+artifacts/
+reports/
+*.bat
+*.log

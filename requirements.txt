@@ -21,4 +21,6 @@ numpy>=1.24
 # --- tests ---
 pytest>=7.4
 
-# The front end uses Cytoscape.js and Chart.js from a CDN. No build step, no npm.
+# The front end is a React + Tailwind SPA, PRE-BUILT into src/sbomguard/static/ui/.
+# A clone needs neither Node nor a CDN to run it: the bundle and the fonts are served
+# from this process. That is deliberate — a demo must not depend on someone else's uptime.
