@@ -2,6 +2,13 @@
 
 **Société Générale GRC Hackathon · PB-10 · Software Supply Chain Risk Analyzer**
 
+**Submitted by**
+
+| Name | Roll number |
+|---|---|
+| Harish HJ | 23PC19 |
+| S Murali Krishna | 23PC31 |
+
 Repository: <https://github.com/harish-88279/SG-Hackathon>
 
 This is the submission document required by the brief. It covers the three things the brief

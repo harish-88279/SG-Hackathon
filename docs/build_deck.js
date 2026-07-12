@@ -29,7 +29,7 @@ const MONO = 'Courier New'
 
 const pres = new Pptx()
 pres.layout = 'LAYOUT_WIDE'          // 13.3 x 7.5 — MUST be set before any slide
-pres.author = 'Harish HJ'
+pres.author = 'Harish HJ · S Murali Krishna'
 pres.title  = 'SBOMGuard — SG GRC Hackathon PB-10'
 
 const slide = (bg = BG) => { const s = pres.addSlide(); s.background = { color: bg }; return s }
@@ -88,12 +88,17 @@ function card(s, x, y, w, h, fill = PANEL) {
   })
 
   s.addText('Société Générale GRC Hackathon  ·  PB-10  ·  Software Supply Chain Risk Analyzer', {
-    x: 0.9, y: 6.3, w: 11.5, h: 0.3, margin: 0,
+    x: 0.9, y: 5.95, w: 11.5, h: 0.3, margin: 0,
     fontFace: BODY, fontSize: 12, color: DIM,
   })
-  s.addText('Harish HJ   ·   github.com/harish-88279/SG-Hackathon', {
-    x: 0.9, y: 6.65, w: 11.5, h: 0.3, margin: 0,
-    fontFace: BODY, fontSize: 12, bold: true, color: MUTED,
+
+  s.addText('SUBMITTED BY', {
+    x: 0.9, y: 6.42, w: 2.0, h: 0.28, margin: 0,
+    fontFace: BODY, fontSize: 10, bold: true, color: DIM, charSpacing: 2,
+  })
+  s.addText('Harish HJ  (23PC19)        S Murali Krishna  (23PC31)', {
+    x: 0.9, y: 6.72, w: 8.6, h: 0.3, margin: 0,
+    fontFace: BODY, fontSize: 13, bold: true, color: INK,
   })
   s.addNotes('December 2021. Log4Shell drops on a Friday. Every security team on earth is asked one question — which of our applications are affected? — and almost none of them can answer it. That question is what this is built to answer.')
 }
@@ -558,8 +563,8 @@ function card(s, x, y, w, h, fill = PANEL) {
   })
 
   const links = [
+    ['Submitted by', 'Harish HJ (23PC19)   ·   S Murali Krishna (23PC31)'],
     ['Repository', 'github.com/harish-88279/SG-Hackathon'],
-    ['Documentation', 'docs/DOCUMENTATION.md  ·  docs/DATA_DEFECT.md'],
     ['Run it', 'start.bat   →   localhost:8000'],
   ]
   links.forEach(([k, v], i) => {

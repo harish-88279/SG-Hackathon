@@ -1,6 +1,8 @@
 # SBOMGuard
 
-**Software Supply Chain Risk Scorer** — Société Générale hackathon, **PB-10**
+**Software Supply Chain Risk Scorer** — Société Générale GRC Hackathon, **PB-10**
+
+**Submitted by** — Harish HJ (23PC19) · S Murali Krishna (23PC31)
 
 > *"Which of our applications are affected by this CVE?"*
 >
@@ -333,3 +335,4 @@ This is the kind of bug that makes a tool confidently, silently wrong. There are
 
 **Built for Société Générale hackathon PB-10.**
 Python 3.10+ · FastAPI · NetworkX · scikit-learn · React 18 · Tailwind CSS · Vite · Cytoscape
+                                                                                    
