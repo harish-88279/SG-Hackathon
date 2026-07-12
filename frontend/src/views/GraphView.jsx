@@ -161,10 +161,8 @@ export default function GraphView({ summary, cve }) {
 
   const lit = useMemo(() => (hover && L ? new Set(L.chain(hover)) : null), [hover, L])
 
-  const onWheel = (e) => {
-    e.preventDefault()
-    setView((v) => ({ ...v, k: Math.min(2.4, Math.max(0.3, v.k * (e.deltaY < 0 ? 1.12 : 0.89))) }))
-  }
+  const zoom = (f) => setView((v) => ({ ...v, k: Math.min(2, Math.max(0.5, v.k * f)) }))
+  const reset = () => setView({ x: 0, y: 0, k: 1 })
   const down = (e) => { drag.current = { ...view, mx: e.clientX, my: e.clientY } }
   const move = (e) => {
     if (!drag.current) return
@@ -185,38 +183,52 @@ export default function GraphView({ summary, cve }) {
         sub="Depth is the x-axis. Column one is code you chose; everything right of it arrived uninvited."
         flush
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={appId} onChange={(e) => setAppId(e.target.value)}
-              className="h-8 w-[190px] rounded-lg border border-line bg-raised px-2.5 text-xs text-ink outline-none focus:border-amber/60"
-            >
-              {summary.applications.map((a) => (
-                <option key={a.app_id} value={a.app_id}>
-                  {a.app_name} — {a.at_risk_count} at risk
-                </option>
-              ))}
-            </select>
-            <Field
-              value={hi} onChange={(e) => setHi(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && load(e.target.value)}
-              placeholder="trace a CVE…" spellCheck={false}
-              className="h-8 w-[168px] font-mono text-xs"
-            />
-            <Btn onClick={() => load()} className="h-8">Trace</Btn>
-            <div className="ml-1 flex rounded-lg border border-line bg-raised p-0.5">
-              {[['At risk', false], ['Everything', true]].map(([lbl, val]) => (
-                <button
-                  key={lbl} onClick={() => setShowClean(val)}
-                  className={cx('rounded-md px-2.5 py-1 text-xs transition-colors',
-                    showClean === val ? 'bg-amber/15 text-amber' : 'text-dim hover:text-ink')}
-                >{lbl}</button>
-              ))}
-            </div>
+          <div className="flex items-center gap-1.5">
+            <Btn onClick={() => zoom(1 / 1.2)} className="h-8 w-8 justify-center p-0">&minus;</Btn>
+            <Btn onClick={() => zoom(1.2)} className="h-8 w-8 justify-center p-0">+</Btn>
+            <Btn onClick={reset} className="h-8">Fit</Btn>
           </div>
         }
       >
         {!data || !L ? <div className="p-6"><Skeleton rows={8} /></div> : (
           <>
+            {/* the controls get a row of their own. Crammed into the header slot they
+                overflowed, and an overflowing control is an unusable one. */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
+              <label className="label mr-1 text-faint">Application</label>
+              <select
+                value={appId} onChange={(e) => setAppId(e.target.value)}
+                className="h-9 min-w-[190px] rounded-lg border border-line bg-raised px-3 text-sm text-ink outline-none focus:border-amber/60"
+              >
+                {summary.applications.map((a) => (
+                  <option key={a.app_id} value={a.app_id} className="bg-raised text-ink">
+                    {a.app_name || a.name || a.app_id}
+                  </option>
+                ))}
+              </select>
+
+              <span className="mx-1 h-5 w-px bg-line" />
+
+              <label className="label mr-1 text-faint">Trace</label>
+              <Field
+                value={hi} onChange={(e) => setHi(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && load(e.target.value)}
+                placeholder="CVE-2021-44228" spellCheck={false}
+                className="h-9 w-[180px] font-mono text-sm"
+              />
+              <Btn kind="solid" onClick={() => load()} className="h-9">Trace</Btn>
+
+              <div className="ml-auto flex rounded-lg border border-line bg-raised p-0.5">
+                {[['At risk', false], ['Everything', true]].map(([lbl, val]) => (
+                  <button
+                    key={lbl} onClick={() => setShowClean(val)}
+                    className={cx('rounded-md px-3 py-1.5 text-xs transition-colors',
+                      showClean === val ? 'bg-amber/15 text-amber' : 'text-dim hover:text-ink')}
+                  >{lbl}</button>
+                ))}
+              </div>
+            </div>
+
             {/* these numbers describe THIS PICTURE, not the estate */}
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
               <Chip n={L.counts.total} of="components drawn" />
@@ -241,8 +253,8 @@ export default function GraphView({ summary, cve }) {
             ) : (
               <div
                 className="relative overflow-hidden bg-deep/40"
-                style={{ height: HEAD_H + 10 + L.h + 14, cursor: drag.current ? 'grabbing' : 'grab' }}
-                onWheel={onWheel} onMouseDown={down} onMouseMove={move}
+                style={{ height: HEAD_H + 10 + L.h * view.k + 14, cursor: drag.current ? 'grabbing' : 'grab' }}
+                onMouseDown={down} onMouseMove={move}
                 onMouseUp={up} onMouseLeave={() => { up(); setHover(null) }}
               >
                 {/* Headers ride the SAME transform as the nodes. Anything else drifts. */}
@@ -337,7 +349,7 @@ export default function GraphView({ summary, cve }) {
                   </span>
                 </div>
                 <div className="pointer-events-none absolute bottom-3 right-4 text-[10.5px] text-faint">
-                  scroll to zoom {'·'} drag to pan {'·'} hover to light its route home {'·'} click to inspect
+                  drag to pan {'·'} hover to light a component's route home {'·'} click to inspect
                 </div>
               </div>
             )}
