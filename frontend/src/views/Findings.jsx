@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { X, Download, ChevronRight } from 'lucide-react'
+import { X, Download } from 'lucide-react'
 import { api } from '../api.js'
 import { sev, cx, Note, RISK_LABEL } from '../lib.jsx'
-import { Panel, Sev, Meta, Field, Skeleton, Blank, Term } from '../components/ui.jsx'
+import { Panel, Sev, Meta, Field, Skeleton, Blank, Table, TH, TD, TR, Term } from '../components/ui.jsx'
 import { Dial } from '../components/Charts.jsx'
 import Chain from '../components/Chain.jsx'
 
@@ -63,74 +63,48 @@ export default function Findings({ summary }) {
         {rows?.length === 0 && <Blank>No findings match these filters.</Blank>}
 
         {rows?.length > 0 && (
-          <div className="pb-3">
-            {/* column key */}
-            <div className="flex items-center gap-4 border-b border-line px-6 pb-2.5">
-              <span className="w-[3px] shrink-0" />
-              <span className="label w-[72px]"><Term k="priority">priority</Term></span>
-              <span className="label w-[48px]"><Term k="flaw">flaw</Term></span>
-              <span className="label min-w-0 flex-1">component</span>
-              <span className="label hidden w-[168px] lg:block">application</span>
-              <span className="label hidden w-[150px] xl:block">problem</span>
-              <span className="label w-[64px]"><Term k="depth">depth</Term></span>
-              <span className="label hidden w-[150px] md:block">cve</span>
-              <span className="w-[14px] shrink-0" />
-            </div>
-
-            {rows.map((r, i) => {
-              const s = sev(r.risk_band)
-              return (
-                <button
-                  key={r.dependency_id}
-                  onClick={() => setOpen(r.dependency_id)}
-                  style={{ animationDelay: `${Math.min(i, 18) * 22}ms` }}
-                  className="group flex w-full animate-rise items-center gap-4 border-b border-line/50 px-6 py-3 text-left transition-all duration-150 hover:bg-ink/[0.045] hover:pl-7"
-                >
-                  {/* heat bar */}
-                  <span
-                    className={cx('h-8 w-[3px] shrink-0 rounded-full', s.dot)}
-                    style={{ boxShadow: `0 0 10px ${s.hex}55` }}
-                  />
-                  <span className={cx('tnum w-[72px] shrink-0 text-md font-semibold', s.fg)}>
-                    {r.priority_score}
-                  </span>
-                  <span className="tnum w-[48px] shrink-0 text-sm text-faint">{r.risk_score}</span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate font-mono text-sm text-ink">{r.library.split(':').pop()}</span>
-                      <span className="hidden font-mono text-xs text-faint sm:inline">{r.version}</span>
-                      {r.dependency_type === 'transitive' && <Meta tone="info">hidden</Meta>}
-                    </span>
-                  </span>
-
-                  <span className="hidden w-[168px] shrink-0 truncate text-sm text-muted lg:block">{r.app_name}</span>
-                  <span className="hidden w-[150px] shrink-0 truncate text-sm text-dim xl:block">
-                    {RISK_LABEL[r.primary_risk] || r.primary_risk}
-                  </span>
-
-                  {/* depth as distance: one dot per layer down */}
-                  <span className="flex w-[64px] shrink-0 items-center gap-1">
-                    {Array.from({ length: Math.min(r.true_depth || 1, 4) }).map((_, d) => (
-                      <span
-                        key={d}
-                        className={cx('h-1.5 w-1.5 rounded-full', d === (r.true_depth || 1) - 1 ? s.dot : 'bg-edge')}
-                      />
-                    ))}
-                    {(r.true_depth || 1) > 4 && <span className="text-xs text-faint">+</span>}
-                  </span>
-
-                  <span className="hidden w-[150px] shrink-0 truncate font-mono text-xs text-faint md:block">
-                    {(r.cve_ids || []).slice(0, 1).join('') || '—'}
-                    {(r.cve_ids || []).length > 1 && <span> +{r.cve_ids.length - 1}</span>}
-                  </span>
-
-                  <ChevronRight size={14} className="shrink-0 text-faint opacity-0 transition-opacity group-hover:opacity-100" />
-                </button>
-              )
-            })}
-
-            <p className="px-6 pt-4 text-sm text-faint">
+          <div className="px-3 pb-3">
+            <Table>
+              <thead>
+                <tr>
+                  <TH className="w-[92px]"><Term k="priority">priority</Term></TH>
+                  <TH className="w-[62px]"><Term k="flaw">flaw</Term></TH>
+                  <TH>component</TH>
+                  <TH>application</TH>
+                  <TH>problem</TH>
+                  <TH className="w-[62px]"><Term k="depth">depth</Term></TH>
+                  <TH>cve</TH>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <TR key={r.dependency_id} onClick={() => setOpen(r.dependency_id)}>
+                    <TD>
+                      <span className="flex items-center gap-2.5">
+                        <span className={cx('h-[5px] w-[5px] rounded-full', sev(r.risk_band).dot)} />
+                        <span className={cx('tnum text-md font-semibold', sev(r.risk_band).fg)}>{r.priority_score}</span>
+                      </span>
+                    </TD>
+                    <TD className="tnum text-sm text-faint">{r.risk_score}</TD>
+                    <TD>
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono text-sm text-ink">{r.library.split(':').pop()}</span>
+                        <span className="font-mono text-xs text-faint">{r.version}</span>
+                        {r.dependency_type === 'transitive' && <Meta tone="info">hidden</Meta>}
+                      </span>
+                    </TD>
+                    <TD className="text-sm text-muted">{r.app_name}</TD>
+                    <TD className="text-sm text-dim">{RISK_LABEL[r.primary_risk] || r.primary_risk}</TD>
+                    <TD className="tnum text-sm text-dim">{r.true_depth}</TD>
+                    <TD className="font-mono text-xs text-faint">
+                      {(r.cve_ids || []).slice(0, 1).join('') || '—'}
+                      {(r.cve_ids || []).length > 1 && <span className="text-faint"> +{r.cve_ids.length - 1}</span>}
+                    </TD>
+                  </TR>
+                ))}
+              </tbody>
+            </Table>
+            <p className="px-3 pt-4 text-sm text-faint">
               {rows.length} of {total} · click any row for the full analysis
             </p>
           </div>
@@ -163,7 +137,7 @@ function Drawer({ id, onClose }) {
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-[2px]" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="h-full w-full max-w-[680px] overflow-y-auto border-l border-edge bg-surface shadow-drawer animate-slide"
+        className="h-full w-full max-w-[680px] overflow-y-auto border-l border-edge bg-surface shadow-pop animate-slide"
       >
         <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-surface/95 px-7 py-5 backdrop-blur">
           <div className="min-w-0">
@@ -222,4 +196,43 @@ function Drawer({ id, onClose }) {
               <Sec label="why this score">
                 <ul className="space-y-2">
                   {d.drivers.map((x, i) => (
-            
+                    <li key={i} className="border-l border-line pl-3.5 text-sm leading-relaxed text-muted">{x}</li>
+                  ))}
+                </ul>
+              </Sec>
+            )}
+
+            {d.suppressed_cves?.length > 0 && (
+              <div className="rounded-md border border-ok/25 bg-ok/[0.05] px-4 py-3.5 text-sm leading-relaxed text-muted">
+                <strong className="font-semibold text-ok">False alarms deliberately muted. </strong>
+                <span className="font-mono text-ok/80">{d.suppressed_cves.join(', ')}</span> technically match this
+                version — but the build we actually ship already contains the fix. A naive scanner would have
+                screamed about every one.
+              </div>
+            )}
+
+            {d.compliance?.length > 0 && (
+              <Sec label="compliance mapping">
+                <ul className="space-y-2">
+                  {d.compliance.map((c, i) => (
+                    <li key={i} className="border-l border-line pl-3.5 text-sm text-muted">
+                      <span className="font-medium text-ink">{c.framework} {c.control}</span>
+                      <span className="text-dim"> — {c.description}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Sec>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const Sec = ({ label, children }) => (
+  <section>
+    <div className="label mb-3">{label}</div>
+    {children}
+  </section>
+)

@@ -8,7 +8,6 @@
 
 @layer base {
   :root { color-scheme: dark; }
-
   html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
   body {
@@ -16,53 +15,45 @@
     font-feature-settings: 'cv05' 1, 'cv08' 1, 'cv11' 1, 'ss03' 1;
   }
 
-  /* Numbers ALWAYS line up. Non-negotiable in a data product. */
   .tnum, table, .font-mono { font-variant-numeric: tabular-nums; }
-
-  ::selection { background: rgba(255, 122, 61, .3); color: #fff; }
-
-  :focus-visible { @apply outline-none ring-2 ring-sg/70 ring-offset-2 ring-offset-canvas rounded-xs; }
-
-  h1, h2, h3 { @apply font-display; }
+  ::selection { background: rgba(255,122,61,.35); color: #fff; }
+  :focus-visible { @apply outline-none ring-2 ring-amber/70 ring-offset-2 ring-offset-canvas rounded-xs; }
 }
 
 @layer components {
-  /* ═══════════════ Dark glass. Neutral, lit from within. */
-  .surface {
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background:
-      linear-gradient(155deg, rgba(255, 250, 240, 0.05) 0%, rgba(255, 250, 240, 0.022) 38%, rgba(255, 250, 240, 0.012) 100%);
-    backdrop-filter: blur(20px) saturate(1.15);
-    -webkit-backdrop-filter: blur(20px) saturate(1.15);
-    box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
-      0 24px 60px -28px rgba(0, 0, 0, 0.55);
+  /* Surfaces are lit from above with a whisper of cream, never flat grey. */
+  .panel {
+    @apply rounded-xl border border-line shadow-card;
+    background: linear-gradient(155deg, rgba(255,250,240,.05), rgba(255,250,240,.024) 38%, rgba(255,250,240,.012));
   }
-
-  .raised {
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: linear-gradient(160deg, rgba(255, 250, 240, 0.045), rgba(255, 250, 240, 0.018));
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+  .panel-soft {
+    @apply rounded-lg border border-line;
+    background: linear-gradient(160deg, rgba(255,250,240,.043), rgba(255,250,240,.02));
   }
-
-  .hairline { border-top: 1px solid rgba(255, 255, 255, 0.06); }
 
   .label { @apply text-micro uppercase text-dim; }
 
   .kbd {
-    @apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-xs
-           px-1 font-mono text-[10px] text-dim;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
+    @apply inline-flex h-[19px] min-w-[19px] items-center justify-center rounded-xs
+           border border-edge bg-raised px-1.5 font-mono text-[10px] text-dim;
   }
 
-  /* Gradient headline ink. Ember → candlelight. The accent, used with restraint. */
-  .ember-text {
-    background: linear-gradient(100deg, #ffb27a 0%, #ff7a3d 45%, #ffc46b 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    filter: drop-
+  /* The one loud thing on the page. It should look like it is switched on. */
+  .btn-amber {
+    background: linear-gradient(100deg, #ffb27a, #ff7a3d 45%, #ffc46b);
+    @apply text-[#2a1405] shadow-amber font-semibold;
+  }
+  .btn-amber:hover { filter: brightness(1.06); }
+  .btn-amber:active { filter: brightness(.96); }
+
+  .text-gradient {
+    background: linear-gradient(100deg, #ffb27a, #ff7a3d 45%, #ffc46b);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+
+* { scrollbar-width: thin; scrollbar-color: #2a2622 transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: #2a2622; border: 2px solid transparent; background-clip: content-box; border-radius: 99px; }
+*::-webkit-scrollbar-thumb:hover { background: #3b352e; background-clip: content-box; }
+*::-webkit-scrollbar-track { background: transparent; }

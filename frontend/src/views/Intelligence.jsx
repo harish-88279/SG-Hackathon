@@ -25,9 +25,7 @@ export default function Intelligence() {
           {cl.error && <div className="px-6 pb-6"><Err error={cl.error} /></div>}
           <div className="mt-5">
             {cl.data?.clusters?.map((c, i) => (
-              <div key={c.cluster_id}
-                   style={{ animationDelay: `${i * 45}ms` }}
-                   className={cx('animate-rise px-6 py-4 transition-colors hover:bg-ink/[0.03]', i !== 0 && 'border-t border-line')}>
+              <div key={c.cluster_id} className={cx('px-6 py-4', i !== 0 && 'border-t border-line')}>
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 className="text-base font-medium text-ink">{c.name}</h3>
                   <span className="tnum shrink-0 text-sm text-dim">{c.size}</span>
@@ -123,4 +121,13 @@ export default function Intelligence() {
                       <TD className="max-w-[380px] text-sm text-dim">{s.one_fix_clears}</TD>
                       <TD className="tnum text-right text-sm font-semibold text-high">{s.leverage_score}</TD>
                     </TR>
-               
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          </>
+        )}
+      </Panel>
+    </div>
+  )
+}

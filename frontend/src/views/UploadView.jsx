@@ -34,19 +34,12 @@ export default function UploadView() {
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); send(e.dataTransfer.files[0]) }}
         className={cx(
-          'mt-6 block cursor-pointer rounded-xl border-2 border-dashed px-6 py-14 text-center transition-all duration-200',
-          over
-            ? 'scale-[1.01] border-sg/70 bg-sg/[0.05] shadow-[0_0_70px_-22px_rgba(255,122,61,.5)]'
-            : 'border-edge hover:border-dim hover:bg-ink/[0.02]'
+          'mt-6 block cursor-pointer rounded-md border border-dashed px-6 py-16 text-center transition-colors',
+          over ? 'border-amber/60 bg-amber/[0.05]' : 'border-edge hover:border-dim hover:bg-hover/40'
         )}
       >
         <input type="file" accept=".json,.csv,.xml" className="hidden" onChange={(e) => send(e.target.files[0])} />
-        <div className={cx(
-          'mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full border transition-all duration-200',
-          over ? 'border-sg/50 bg-sg/[0.09] shadow-glow' : 'border-line bg-ink/[0.04]'
-        )}>
-          <UploadCloud size={22} strokeWidth={1.5} className={over ? 'text-sg' : 'text-dim'} />
-        </div>
+        <UploadCloud size={26} strokeWidth={1.4} className="mx-auto mb-4 text-faint" />
         <p className="text-base text-muted">Drop an SBOM here, or click to choose</p>
         <p className="mt-1.5 text-sm text-faint">CycloneDX JSON · SPDX JSON · CSV</p>
         <p className="mt-4 font-mono text-xs text-faint">examples/real-cyclonedx-sample.json</p>
@@ -87,4 +80,15 @@ export default function UploadView() {
                       <span className="font-mono text-xs text-faint">{f.version}</span>
                       {f.dependency_type === 'transitive' && <Meta tone="info">hidden</Meta>}
                     </span>
-               
+                  </TD>
+                  <TD className="text-sm text-dim">{RISK_LABEL[f.primary_risk] || f.primary_risk}</TD>
+                  <TD className="font-mono text-xs text-faint">{(f.cve_ids || []).slice(0, 1).join('') || '—'}</TD>
+                </TR>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
+    </Panel>
+  )
+}

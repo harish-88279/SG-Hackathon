@@ -39,10 +39,10 @@ export default function Chain({ chain, vuln, compact = false }) {
 
             <div
               className={cx(
-                'flex flex-col justify-center rounded-md border px-2.5 py-1.5 backdrop-blur-sm transition-colors',
-                isApp   && 'border-low/35 bg-low/[0.08]',
-                isVuln  && 'border-crit/45 bg-crit/[0.1] shadow-[0_0_20px_-4px_rgba(255,93,93,.4)]',
-                !isApp && !isVuln && 'border-line bg-ink/[0.035]'
+                'flex flex-col justify-center rounded border px-2.5 py-1.5 transition-colors',
+                isApp   && 'border-low/35 bg-low/[0.07]',
+                isVuln  && 'border-crit/45 bg-crit/[0.09]',
+                !isApp && !isVuln && 'border-line bg-raised'
               )}
             >
               <span className={cx(
@@ -62,4 +62,10 @@ export default function Chain({ chain, vuln, compact = false }) {
                   {isApp ? 'your app' : isVuln ? 'the flaw' : `depth ${i}`}
                 </span>
               )}
-     
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}

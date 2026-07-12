@@ -34,20 +34,18 @@ export default function Proof() {
           </Note>
         </div>
 
-        <div className="mt-6 grid gap-3 px-6 pb-6 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-6">
           {ROWS.map(([name, target, got, why], i) => (
-            <div
-              key={name}
-              style={{ animationDelay: `${i * 55}ms` }}
-              className="raised liftable animate-rise p-4"
-            >
-              <div className="flex items-center justify-between">
-                <span className="h-1.5 w-1.5 rounded-full bg-ok" style={{ boxShadow: '0 0 8px #5fcf9a' }} />
-                <span className="label">target {target}</span>
+            <div key={name} className={cx('flex items-center gap-5 px-6 py-4', i !== 0 && 'border-t border-line')}>
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />
+              <div className="min-w-0 flex-1">
+                <div className="text-base text-ink">{name}</div>
+                <div className="mt-0.5 text-sm text-dim">{why}</div>
               </div>
-              <div className="tnum mt-3 font-display text-2xl font-semibold text-ok">{got}</div>
-              <div className="mt-1.5 text-sm font-medium text-ink">{name}</div>
-              <div className="mt-1 text-xs leading-relaxed text-dim">{why}</div>
+              <div className="tnum shrink-0 text-right">
+                <div className="text-md font-semibold text-ok">{got}</div>
+                <div className="label mt-1">target {target}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -64,4 +62,9 @@ export default function Proof() {
           <pre className="overflow-x-auto rounded-md border border-line bg-canvas px-5 py-4 font-mono text-[11.5px] leading-[1.75] text-dim">
             {out}
           </pre>
-   
+        )}
+        {!out && !busy && !err && <Blank>Two seconds. Nothing is precomputed.</Blank>}
+      </Panel>
+    </div>
+  )
+}

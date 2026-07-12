@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 
 /* ═══════════════════════════════════════════════════════ severity tokens
-   Colour is SIGNAL. It is never decoration. Severity is a HEAT ramp —
-   the more dangerous a component, the hotter it glows. */
+   Colour is SIGNAL. It is never decoration. A component only gets a colour
+   if that colour tells you something you would otherwise have to read. */
 export const SEV = {
   CRITICAL:   { fg: 'text-crit', bg: 'bg-crit/10',  bd: 'border-crit/25',  dot: 'bg-crit', hex: '#ff5d5d' },
   HIGH:       { fg: 'text-high', bg: 'bg-high/10',  bd: 'border-high/25',  dot: 'bg-high', hex: '#ffa14d' },
@@ -56,8 +56,8 @@ export function Note({ children, accent = false }) {
     <aside
       className={cx(
         'relative py-1 pl-4 text-sm leading-[1.7] text-muted animate-rise',
-        'before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:rounded-full',
-        accent ? 'before:bg-gradient-to-b before:from-sg/70 before:to-gold/30' : 'before:bg-edge'
+        'before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[2px] before:rounded-full',
+        accent ? 'before:bg-amber' : 'before:bg-edge'
       )}
     >
       {children}
@@ -92,4 +92,6 @@ export function useHotkey(key, fn, meta = true) {
       }
     }
     window.addEventListener('keydown', h)
-    return () => window.remov
+    return () => window.removeEventListener('keydown', h)
+  }, [key, fn, meta])
+}

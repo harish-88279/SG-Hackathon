@@ -2,38 +2,43 @@
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
-    // A deliberately SMALL, opinionated scale. Every value earns its place.
     fontSize: {
-      micro: ['10.5px', { lineHeight: '1.4', letterSpacing: '0.09em', fontWeight: '600' }],
+      micro: ['10.5px', { lineHeight: '1.4', letterSpacing: '0.08em', fontWeight: '600' }],
       xs:    ['11.5px', { lineHeight: '1.5' }],
       sm:    ['12.5px', { lineHeight: '1.55' }],
       base:  ['13.5px', { lineHeight: '1.65' }],
       md:    ['15px',   { lineHeight: '1.5', letterSpacing: '-0.006em' }],
       lg:    ['18px',   { lineHeight: '1.35', letterSpacing: '-0.012em' }],
-      xl:    ['22px',   { lineHeight: '1.25', letterSpacing: '-0.016em' }],
-      '2xl': ['28px',   { lineHeight: '1.18', letterSpacing: '-0.02em' }],
-      '3xl': ['36px',   { lineHeight: '1.1',  letterSpacing: '-0.024em' }],
-      '4xl': ['52px',   { lineHeight: '1',    letterSpacing: '-0.028em' }],
+      xl:    ['22px',   { lineHeight: '1.25', letterSpacing: '-0.018em' }],
+      '2xl': ['30px',   { lineHeight: '1.16', letterSpacing: '-0.022em' }],
+      '3xl': ['38px',   { lineHeight: '1.08', letterSpacing: '-0.028em' }],
+      '4xl': ['54px',   { lineHeight: '1',    letterSpacing: '-0.032em' }],
     },
     extend: {
       colors: {
-        // Dark neutral ladder with a faint warm undertone. Charcoal, not orange.
+        // A WARM black. Neutral greys read as clinical; this reads as a lit room at night.
         canvas:  '#0f0e0c',
-        surface: '#171512',
-        raised:  '#211e1a',
-        hover:   '#292520',
-        line:    '#2e2a24',   // hairline
-        edge:    '#413b33',   // stronger edge
+        deep:    '#0c0b0a',
+        surface: '#131110',
+        raised:  '#181614',
+        hover:   '#1e1b18',
+        line:    'rgba(255,255,255,.07)',
+        edge:    'rgba(255,255,255,.13)',
 
-        ink:   '#f2eee7',     // primary text
-        muted: '#b9b1a5',     // secondary
-        dim:   '#847c6f',     // tertiary
-        faint: '#544e44',     // quaternary / disabled
+        ink:   '#f2eee7',     // warm cream, not white
+        muted: '#a89f92',
+        dim:   '#847c6f',
+        faint: '#5a5349',
 
-        sg:    '#ff7a3d',     // ember. The ONE accent.
-        gold:  '#ffc46b',     // ember's gradient partner
+        // ONE accent, and it is amber — not the obvious security-dashboard red.
+        // Red everywhere is how a dashboard teaches you to ignore red.
+        amber: {
+          DEFAULT: '#ff7a3d',
+          light:   '#ffb27a',
+          gold:    '#ffc46b',
+          deep:    '#e0501a',
+        },
 
-        // Severity as a heat ramp. Danger literally glows hotter.
         crit: '#ff5d5d',
         high: '#ffa14d',
         med:  '#f2c94c',
@@ -46,16 +51,27 @@ export default {
         sans: ['"Inter Variable"', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono Variable"', 'ui-monospace', 'Menlo', 'monospace'],
       },
-      borderRadius: { xs: '5px', DEFAULT: '9px', md: '12px', lg: '18px', xl: '24px' },
+      borderRadius: { xs: '4px', DEFAULT: '7px', md: '10px', lg: '14px', xl: '20px', '2xl': '26px' },
       boxShadow: {
-        glass: '0 1px 0 0 rgba(255,220,180,.07) inset, 0 24px 60px -24px rgba(0,0,0,.55)',
-        lift:  '0 1px 0 0 rgba(255,220,180,.12) inset, 0 32px 72px -24px rgba(0,0,0,.65), 0 0 60px -14px rgba(255,122,61,.45)',
-        glow:  '0 0 34px -4px rgba(255,122,61,.8), 0 6px 24px -6px rgba(255,122,61,.5), 0 1px 0 rgba(255,255,255,.28) inset',
-        pop:   '0 32px 80px -16px rgba(0,0,0,.75), 0 0 0 1px rgba(255,200,150,.09), 0 1px 0 rgba(255,220,180,.08) inset',
-        drawer:'-32px 0 90px -16px rgba(0,0,0,.8)',
+        amber: '0 8px 30px -8px rgba(255,122,61,.5), inset 0 1px 0 rgba(255,255,255,.28)',
+        glow:  '0 0 40px -6px rgba(255,122,61,.35)',
+        pop:   '0 20px 60px -14px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.07)',
+        card:  'inset 0 1px 0 rgba(255,255,255,.05)',
       },
       keyframes: {
-        rise:   { from: { opacity: 0, transform: 'translateY(10px)' }, to: { opacity: 1, transform: 'none' } },
-        slide:  { from: { transform: 'translateX(32px)', opacity: 0 }, to: { transform: 'none', opacity: 1 } },
-        pop:    { from: { opacity: 0, transform: 'scale(.96) translateY(6px)' }, to: { opacity: 1, transform: 'none' } },
-        pulseline: { '0%,100%': { opacity: .25 }
+        rise:  { from: { opacity: 0, transform: 'translateY(6px)' }, to: { opacity: 1, transform: 'none' } },
+        slide: { from: { transform: 'translateX(26px)', opacity: 0 }, to: { transform: 'none', opacity: 1 } },
+        pop:   { from: { opacity: 0, transform: 'scale(.97)' }, to: { opacity: 1, transform: 'none' } },
+        sweep: { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(100%)' } },
+        twinkle: { '0%,100%': { opacity: .25 }, '50%': { opacity: .9 } },
+      },
+      animation: {
+        rise:  'rise .34s cubic-bezier(.16,1,.3,1) both',
+        slide: 'slide .34s cubic-bezier(.16,1,.3,1) both',
+        pop:   'pop .16s cubic-bezier(.16,1,.3,1) both',
+        sweep: 'sweep 1.5s ease-in-out infinite',
+      },
+    },
+  },
+  plugins: [],
+}

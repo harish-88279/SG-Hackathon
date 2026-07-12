@@ -51,40 +51,25 @@ export default function Gate() {
 
       {!busy && r && (
         <>
-          {/* the verdict. A stamp, not a log line. */}
-          <div className={cx('mt-6 flex items-center gap-5 border-y px-6 py-5',
-            r.passed ? 'border-ok/25 bg-ok/[0.05]' : 'border-crit/25 bg-crit/[0.05]')}>
-            <span
-              className={cx(
-                'grid h-14 w-14 shrink-0 place-items-center rounded-xl text-2xl font-bold text-white',
-                r.passed ? 'bg-gradient-to-b from-ok to-[#3da975]' : 'animate-breathe bg-gradient-to-b from-crit to-[#d63c3c]'
-              )}
-              style={{ boxShadow: `0 0 36px -6px ${r.passed ? '#5fcf9a' : '#ff5d5d'}99` }}
-            >
-              {r.passed ? '✓' : '✕'}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className={cx('font-display text-lg font-semibold tracking-tight', r.passed ? 'text-ok' : 'text-crit')}>
-                {r.passed ? 'Build allowed' : 'Build blocked'}
-              </div>
-              <div className="mt-0.5 font-mono text-sm text-muted">{r.verdict}</div>
-            </div>
-            <span className="shrink-0 rounded-md border border-line bg-black/40 px-2.5 py-1 font-mono text-xs text-dim">
-              exit {r.exit_code}
-            </span>
+          {/* the verdict, as a terminal would print it */}
+          <div className={cx('mt-6 flex items-center gap-4 border-y px-6 py-4 font-mono text-sm',
+            r.passed ? 'border-ok/25 bg-ok/[0.05] text-ok' : 'border-crit/25 bg-crit/[0.05] text-crit')}>
+            <span className="font-semibold">{r.passed ? '✓' : '✕'}</span>
+            <span className="flex-1">{r.verdict}</span>
+            <span className="rounded-xs bg-black/40 px-2 py-0.5 text-xs">exit {r.exit_code}</span>
           </div>
 
           {r.blocks?.length > 0 && (
             <>
               <div className="label px-6 pb-3 pt-6">blocking the build · {r.block_count}</div>
-              {r.blocks.slice(0, 10).map((b, i) => <V key={i} v={b} i={i} blocking />)}
+              {r.blocks.slice(0, 10).map((b, i) => <V key={i} v={b} blocking />)}
             </>
           )}
 
           {r.warnings?.length > 0 && (
             <>
               <div className="label px-6 pb-3 pt-6">warnings · {r.warning_count} · reported, not blocking</div>
-              {r.warnings.slice(0, 5).map((w, i) => <V key={i} v={w} i={i} />)}
+              {r.warnings.slice(0, 5).map((w, i) => <V key={i} v={w} />)}
             </>
           )}
 
@@ -102,6 +87,20 @@ export default function Gate() {
   )
 }
 
-function V({ v, blocking, i = 0 }) {
+function V({ v, blocking }) {
   return (
-    <div style={{ animationDelay: `${Math.min(i, 10) * 3
+    <div className="flex gap-4 border-t border-line px-6 py-3.5 first:border-t-0">
+      <span className={cx('mt-1.5 h-[5px] w-[5px] shrink-0 rounded-full', blocking ? 'bg-crit' : 'bg-med')} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-sm text-ink">{v.library}</span>
+          <span className="font-mono text-xs text-faint">{v.version}</span>
+          <span className="text-xs text-dim">in {v.app_name}</span>
+          <Meta tone={blocking ? 'crit' : undefined}>{v.rule.replace(/_/g, ' ')}</Meta>
+        </div>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">{v.message}</p>
+        <p className="mt-1 text-sm text-ok">→ {v.remediation}</p>
+      </div>
+    </div>
+  )
+}

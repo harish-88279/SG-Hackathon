@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import gsap from 'gsap'
+import React, { useCallback, useState } from 'react'
 import {
   Crosshair, ListOrdered, GitBranch, Hammer, Sparkles,
   Scale, ShieldBan, FileUp, Award, Command,
 } from 'lucide-react'
-import { ExplainProvider, useExplain, useAsync, useHotkey, useCountUp, cx } from './lib.jsx'
+import { ExplainProvider, useExplain, useAsync, useHotkey, cx } from './lib.jsx'
 import { api } from './api.js'
 import { Skeleton, Err } from './components/ui.jsx'
 import Palette from './components/Palette.jsx'
@@ -53,61 +52,14 @@ const TITLES = {
   proof: ['Scorecard', 'Measured against ground truth'],
 }
 
-/* The living warmth every pane of glass sits on. Three embers, kept faint. */
-function Aurora() {
-  return (
-    <>
-      <div className="aurora-blob animate-drift1 -top-40 right-[-10%] h-[520px] w-[520px] bg-sg/[0.07]" />
-      <div className="aurora-blob animate-drift2 bottom-[-15%] left-[-8%] h-[620px] w-[620px] bg-[#d65d28]/[0.05]" />
-      <div className="aurora-blob animate-drift3 left-[38%] top-[30%] h-[380px] w-[380px] bg-gold/[0.03]" />
-    </>
-  )
-}
-
-/* A thin line of ember under the header, tracking how deep you've read. */
-function ScrollProgress() {
-  const [p, setP] = useState(0)
-  useEffect(() => {
-    const h = () => {
-      const d = document.documentElement
-      const max = d.scrollHeight - d.clientHeight
-      setP(max > 0 ? Math.min(window.scrollY / max, 1) : 0)
-    }
-    h()
-    window.addEventListener('scroll', h, { passive: true })
-    window.addEventListener('resize', h)
-    return () => { window.removeEventListener('scroll', h); window.removeEventListener('resize', h) }
-  }, [])
-  return (
-    <div className="pointer-events-none absolute bottom-[-1px] left-0 h-[2px] w-full">
-      <div
-        className="h-full bg-gradient-to-r from-sg to-gold transition-[width] duration-150 ease-out"
-        style={{ width: `${p * 100}%`, boxShadow: p > 0.01 ? '0 0 10px rgba(255,122,61,.55)' : 'none' }}
-      />
-    </div>
-  )
-}
-
 function Shell() {
   const [tab, setTab] = useState('overview')
-  const [cve, setCve] = useState('CVE-2021-44228')
+  const [cve, setCve] = useState(null)   // the estate picks its own headline CVE
   const [palette, setPalette] = useState(false)
   const { on, toggle } = useExplain()
   const { loading, data, error } = useAsync(api.summary, [])
-  const rail = useRef(null)
 
   useHotkey('k', () => setPalette(true))
-
-  /* the rail wakes up: items cascade in from the left */
-  useEffect(() => {
-    if (!rail.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const ctx = gsap.context(() => {
-      gsap.fromTo('.nav-item',
-        { opacity: 0, x: -16 },
-        { opacity: 1, x: 0, duration: 0.35, stagger: 0.035, ease: 'power3.out', delay: 0.1 })
-    }, rail)
-    return () => ctx.revert()
-  }, [])
 
   const pick = useCallback((id) => { setCve(id); setTab('overview') }, [])
   const View = VIEWS[tab]
@@ -115,72 +67,116 @@ function Shell() {
   const s = data?.stats
 
   return (
-    <div className="aurora grain flex min-h-screen">
-      <Aurora />
+    <div className="grain flex min-h-screen">
       <Palette open={palette} onClose={() => setPalette(false)} onPick={pick} />
 
-      {/* ══════════════════════════════════════════════ floating glass rail */}
-      <aside ref={rail} className="sticky top-0 z-20 hidden h-screen w-[236px] shrink-0 p-3 pr-0 md:block">
-        <div className="surface flex h-full flex-col !rounded-xl">
-          <div className="flex items-center gap-2.5 px-5 pb-6 pt-6">
-            <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-[#ff8b52] to-[#e0501a] shadow-glow">
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                <path d="M10 1L2.5 4v5.5c0 4.5 3.2 8.2 7.5 9.5 4.3-1.3 7.5-5 7.5-9.5V4L10 1z"
-                      stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
-                <path d="M10 6.5v4M10 13.2v.6" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="min-w-0 leading-none">
-              <div className="font-display text-[15px] font-semibold tracking-tight text-ink">SBOMGuard</div>
-              <div className="mt-1 text-[10.5px] tracking-[0.04em] text-dim">Supply chain risk</div>
-            </div>
+      {/* ══════════════════════════════════════════════ rail */}
+      <aside className="sticky top-3 m-3 mr-0 flex h-[calc(100vh-24px)] w-[214px] shrink-0 flex-col
+                        rounded-2xl border border-line bg-surface/80 shadow-card backdrop-blur-xl">
+        <div className="flex items-center gap-3 px-5 pb-6 pt-6">
+          <span className="btn-amber relative grid h-9 w-9 shrink-0 place-items-center rounded-xl">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
+              <path d="M10 1.6L3.4 4.3v5c0 4.1 2.8 7.5 6.6 8.7 3.8-1.2 6.6-4.6 6.6-8.7v-5L10 1.6z"
+                    stroke="#2a1405" strokeWidth="1.7" strokeLinejoin="round" />
+              <path d="M10 6.6v4.1M10 13.4v.7"
+                    stroke="#2a1405" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
+          <div className="min-w-0 leading-none">
+            <div className="font-display text-[15px] font-semibold tracking-[-0.02em] text-ink">SBOMGuard</div>
+            <div className="mt-1.5 text-[10.5px] tracking-[0.03em] text-faint">Supply chain risk</div>
           </div>
+        </div>
 
-          <nav className="flex-1 space-y-6 overflow-y-auto px-2.5">
-            {NAV.map(({ g, items }) => (
-              <div key={g}>
-                <div className="label px-3 pb-2">{g}</div>
-                <div className="space-y-0.5">
-                  {items.map(({ id, label, icon: Icon }) => {
-                    const active = tab === id
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => setTab(id)}
-                        className={cx(
-                          'nav-item group relative flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-base',
-                          'transition-all duration-150',
-                          active
-                            ? 'bg-gradient-to-r from-sg/[0.13] to-transparent text-ink shadow-[inset_0_1px_0_rgba(255,255,255,.07),0_0_20px_-8px_rgba(255,122,61,.35)]'
-                            : 'text-dim hover:bg-ink/[0.04] hover:pl-4 hover:text-muted'
-                        )}
-                      >
-                        <span className={cx(
-                          'absolute left-0 top-1/2 h-4 w-[2.5px] -translate-y-1/2 rounded-r-full bg-gradient-to-b from-sg to-gold',
-                          'transition-all duration-300',
-                          active ? 'opacity-100' : 'opacity-0'
-                        )} />
-                        <Icon size={14} strokeWidth={1.9}
-                              className={cx('shrink-0 transition-colors', active ? 'text-sg' : 'text-faint group-hover:text-dim')} />
-                        <span className="truncate">{label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+        <nav className="flex-1 space-y-6 px-2.5">
+          {NAV.map(({ g, items }) => (
+            <div key={g}>
+              <div className="label px-2.5 pb-2">{g}</div>
+              <div className="space-y-px">
+                {items.map(({ id, label, icon: Icon }) => {
+                  const active = tab === id
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setTab(id)}
+                      className={cx(
+                        'group relative flex w-full items-center gap-2.5 rounded px-2.5 py-[7px] text-left text-base transition-colors duration-100',
+                        active ? 'bg-hover text-ink' : 'text-dim hover:bg-hover/50 hover:text-muted'
+                      )}
+                    >
+                      {active && <span className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r-full bg-amber" />}
+                      <Icon size={14} strokeWidth={1.9} className={cx('shrink-0', active ? 'text-amber' : 'text-faint group-hover:text-dim')} />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  )
+                })}
               </div>
-            ))}
-          </nav>
+            </div>
+          ))}
+        </nav>
 
-          <div className="space-y-1 border-t border-line/60 p-2.5">
-            <button
-              onClick={() => setPalette(true)}
-              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-base text-dim transition-colors hover:bg-ink/[0.04] hover:text-muted"
-            >
-              <Command size={14} strokeWidth={1.9} className="shrink-0 text-faint" />
-              <span className="flex-1 text-left">Search CVE</span>
-              <kbd className="kbd">⌘K</kbd>
-            </button>
+        <div className="space-y-1 border-t border-line p-2.5">
+          <button
+            onClick={() => setPalette(true)}
+            className="flex w-full items-center gap-2.5 rounded px-2.5 py-[7px] text-base text-dim transition-colors hover:bg-hover/50 hover:text-muted"
+          >
+            <Command size={14} strokeWidth={1.9} className="shrink-0 text-faint" />
+            <span className="flex-1 text-left">Search CVE</span>
+            <kbd className="kbd">⌘K</kbd>
+          </button>
 
-            <button
-              onClick={toggle}
-              classNam
+          <button
+            onClick={toggle}
+            className="flex w-full items-center gap-2.5 rounded px-2.5 py-[7px] text-base text-dim transition-colors hover:bg-hover/50 hover:text-muted"
+          >
+            <span className={cx('h-[5px] w-[5px] shrink-0 rounded-full transition-colors', on ? 'bg-ok' : 'bg-faint')} />
+            <span className="flex-1 text-left">Plain English</span>
+            <span className={cx('text-[10px] font-semibold uppercase tracking-wide', on ? 'text-ok' : 'text-faint')}>
+              {on ? 'on' : 'off'}
+            </span>
+          </button>
+        </div>
+      </aside>
+
+      {/* ══════════════════════════════════════════════ main */}
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 bg-canvas/70 backdrop-blur-xl">
+          <div className="flex h-[58px] items-center justify-between gap-8 px-8">
+            <div className="flex items-baseline gap-3">
+              <h1 className="font-display text-md font-semibold tracking-tight text-ink">{title}</h1>
+              <span className="text-sm text-faint">{sub}</span>
+            </div>
+            {s && (
+              <div className="hidden items-center gap-px lg:flex">
+                <Tick v={s.total_dependencies} l="components" />
+                <Tick v={s.at_risk} l="at risk" c="text-crit" />
+                <Tick v={s.unique_cves} l="cves" c="text-high" />
+                <Tick v={s.known_exploited_cves} l="exploited" c="text-info" />
+                <Tick v={s.suppressed_false_positives} l="muted" c="text-ok" last />
+              </div>
+            )}
+          </div>
+        </header>
+
+        <main className="mx-auto w-full max-w-[1500px] flex-1 px-7 py-6">
+          {loading && <Skeleton rows={7} />}
+          {error && <Err error={error} />}
+          {data && <View summary={data} cve={cve} setCve={setCve} goto={setTab} openPalette={() => setPalette(true)} />}
+        </main>
+      </div>
+    </div>
+  )
+}
+
+function Tick({ v, l, c = 'text-ink', last }) {
+  return (
+    <div className={cx('px-4 text-right', !last && 'border-r border-line')}>
+      <div className={cx('tnum text-md font-semibold leading-none', c)}>{v}</div>
+      <div className="label mt-1.5">{l}</div>
+    </div>
+  )
+}
+
+export default function App() {
+  return <ExplainProvider><Shell /></ExplainProvider>
+}
