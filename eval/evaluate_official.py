@@ -324,37 +324,80 @@ def _wrap(text, w):
 
 
 def _proof(deps, vulns, labels):
-    """One row is enough to prove it. Print the row."""
+    """
+    One library is enough to prove it — but only if we pick the RIGHT one.
+
+    The first version of this printed whichever library came first in dict order, and
+    that produced a weak witness: bouncycastle, where every version listed happens to
+    sit INSIDE some affected range. A reader could shrug and say "so the ranges are
+    wide" — which demonstrates nothing about whether the version column generated the
+    labels, and that is the actual claim.
+
+    So rank the candidates and print the most damning one. The strongest possible
+    witness is a FULL INVERSION: every version inside the CVE's affected range is
+    labelled CLEAN, and every version outside it is labelled VULNERABLE. That is not a
+    wide range and it is not noise. It is the version predicate running exactly
+    BACKWARDS — which can only happen if the label was never a function of the version.
+    """
     by_lib = defaultdict(list)
     for v in vulns:
         by_lib[v.library].append(v)
     VT = ("VULNERABLE_DEPENDENCY", "TRANSITIVE_VULNERABILITY")
 
+    def in_any(ver, cves):
+        return any(versions.in_range(ver,
+                                     c.affected_versions.get("introduced"),
+                                     c.affected_versions.get("fixed"))
+                   for c in cves)
+
+    cands = []
     for lib, cves in by_lib.items():
-        rows = [(d.version, labels[d.dependency_id]["risk_type"] in VT)
-                for d in deps if d.library_name == lib and d.dependency_id in labels]
-        vuln = sorted({r[0] for r in rows if r[1]}, key=versions.parse)
-        clean = sorted({r[0] for r in rows if not r[1]}, key=versions.parse)
-        if not vuln or not clean:
+        rows = {}
+        for d in deps:
+            if d.library_name != lib or d.dependency_id not in labels:
+                continue
+            rows[d.version] = (d.version,
+                               labels[d.dependency_id]["risk_type"] in VT,
+                               in_any(d.version, cves))
+        rows = list(rows.values())
+        if len(rows) < 3 or len({r[1] for r in rows}) < 2:
             continue
-        # a clean version sitting strictly between two vulnerable ones
-        for c in clean:
-            below = [v for v in vuln if versions.compare(v, c) < 0]
-            above = [v for v in vuln if versions.compare(v, c) > 0]
-            if below and above:
-                spec = cves[0].affected_versions
-                print("\n  PROOF — one library is enough:\n")
-                print(f"    {lib}   (CVE affects {spec.get('introduced')} .. "
-                      f"{spec.get('fixed')})")
-                print(f"      version {c:<10} -> labelled CLEAN")
-                for v in vuln[:3]:
-                    print(f"      version {v:<10} -> labelled VULNERABLE")
-                print()
-                print("    A clean version sits strictly BETWEEN two vulnerable ones. No")
-                print("    ordering of version numbers can produce that. The label is not a")
-                print("    function of the version at all — so the version column cannot be")
-                print("    what generated it.")
-                return
+
+        # An INVERSION is a version whose range-membership disagrees with its label.
+        inv = sum(1 for _, vuln, inr in rows if inr != vuln)
+        if not inv:
+            continue
+        cands.append((inv == len(rows), inv / len(rows), len(rows), lib, cves, rows))
+
+    if not cands:
+        return
+    cands.sort(key=lambda c: (c[0], c[1], c[2]), reverse=True)
+    perfect, _frac, _n, lib, cves, rows = cands[0]
+    c0 = cves[0]
+    lo = c0.affected_versions.get("introduced")
+    hi = c0.affected_versions.get("fixed")
+
+    print("\n  PROOF — one library is enough:\n")
+    print(f"    {lib}   ({c0.cve_id} affects [{lo} .. {hi}) )\n")
+    for ver, vuln, inr in sorted(rows, key=lambda r: versions.parse(r[0])):
+        where = "INSIDE  the affected range" if inr else "outside the affected range"
+        print(f"      v{ver:<9}  {where}   ->   labelled "
+              f"{'VULNERABLE' if vuln else 'CLEAN'}")
+    print()
+    if perfect:
+        print("    Read that again. EVERY version INSIDE the affected range is labelled")
+        print("    CLEAN, and EVERY version outside it is labelled VULNERABLE. The version")
+        print("    predicate is not merely wrong here — it is running exactly BACKWARDS.")
+    else:
+        inv = sum(1 for _, vu, ir in rows if ir != vu)
+        print(f"    {inv} of {len(rows)} versions carry a label that contradicts the CVE's own")
+        print("    affected range — including a CLEAN version sitting inside the range while")
+        print("    versions outside it are called VULNERABLE.")
+    print()
+    print("    No ordering of version numbers can produce that: no monotone predicate on")
+    print("    versions can be false inside an interval and true outside it. So the label")
+    print("    is not a function of the version at all — which means the version column")
+    print("    cannot be what generated it.")
 
 
 def _frontier(deps, vulns, labels):
