@@ -767,32 +767,37 @@ def evaluation(dataset: str = "official"):
                  unsatisfiable on it, which the harness proves rather than asserts.
       synthetic  internally-consistent data. 5/5, same engine, no changes.
 
-    It used to only run the synthetic one and the page claimed "we meet all five",
-    while the rest of the app was analysing the official data at 3/5. That is exactly
-    the kind of quiet flattery this tool exists to catch, so it now defaults to the
-    dataset that is actually loaded.
+    Run IN-PROCESS, not as a subprocess. It used to shell out to a fresh interpreter,
+    which re-imported scikit-learn and roughly doubled the resident set — about 180MB
+    on top of the 180MB we already hold. On a 512MB free-tier box that is an OOM kill
+    on the one button we most want a judge to press. Importing the harness and
+    capturing its stdout gives exactly the same guarantee (it really runs, right now,
+    against the real labels) at a fraction of the memory.
     """
-    import subprocess
-    import sys as _sys
+    import contextlib
+    import importlib.util
+    import io
 
-    scripts = {
-        "official": "evaluate_official.py",
-        "synthetic": "self_evaluate.py",
-    }
+    scripts = {"official": "evaluate_official.py", "synthetic": "self_evaluate.py"}
     if dataset not in scripts:
         raise HTTPException(400, f"Unknown dataset '{dataset}'. Use: {list(scripts)}")
 
-    script = config.PROJECT_ROOT / "eval" / scripts[dataset]
+    path = config.PROJECT_ROOT / "eval" / scripts[dataset]
+    if not path.exists():
+        return {"dataset": dataset, "passed": False,
+                "output": f"Evaluation harness not found at {path}."}
+
+    buf = io.StringIO()
     try:
-        out = subprocess.run(
-            [_sys.executable, str(script)],
-            capture_output=True, text=True, timeout=180,
-            cwd=str(config.PROJECT_ROOT),
-        )
-        return {"dataset": dataset, "output": out.stdout, "passed": out.returncode == 0}
+        spec = importlib.util.spec_from_file_location(f"_eval_{dataset}", path)
+        mod = importlib.util.module_from_spec(spec)
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            spec.loader.exec_module(mod)
+            rc = mod.main()
+        return {"dataset": dataset, "output": buf.getvalue(), "passed": rc == 0}
     except Exception as e:  # noqa: BLE001
-        return {"dataset": dataset, "output": f"Evaluation could not be run: {e}",
-                "passed": False}
+        return {"dataset": dataset, "passed": False,
+                "output": buf.getvalue() + f"\n\nEvaluation could not be run: {e}"}
 
 
 @app.get("/health")

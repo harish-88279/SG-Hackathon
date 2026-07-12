@@ -1,0 +1,22 @@
+# Render blueprint — https://render.com
+#
+# Free tier, no credit card. Render reads this file, builds the Dockerfile, and gives you
+# an HTTPS URL. Nothing else to configure: no database, no secrets, no volumes.
+#
+# The free instance sleeps after 15 minutes of inactivity and takes ~50s to wake. That is
+# the one real cost of "free", and it matters on demo day — see docs/DEPLOY.md for how to
+# keep it warm before you present.
+
+services:
+  - type: web
+    name: sbomguard
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Render injects PORT itself; the Dockerfile binds ${PORT}. Do not hardcode it.
+      - key: PYTHONUNBUFFERED
+        value: "1"
