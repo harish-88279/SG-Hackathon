@@ -1,0 +1,68 @@
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: dark; }
+
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+  body {
+    @apply bg-canvas text-ink font-sans text-base;
+    font-feature-settings: 'cv05' 1, 'cv08' 1, 'cv11' 1, 'ss03' 1;
+  }
+
+  /* Numbers ALWAYS line up. Non-negotiable in a data product. */
+  .tnum, table, .font-mono { font-variant-numeric: tabular-nums; }
+
+  ::selection { background: rgba(255, 122, 61, .3); color: #fff; }
+
+  :focus-visible { @apply outline-none ring-2 ring-sg/70 ring-offset-2 ring-offset-canvas rounded-xs; }
+
+  h1, h2, h3 { @apply font-display; }
+}
+
+@layer components {
+  /* ═══════════════ Dark glass. Neutral, lit from within. */
+  .surface {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background:
+      linear-gradient(155deg, rgba(255, 250, 240, 0.05) 0%, rgba(255, 250, 240, 0.022) 38%, rgba(255, 250, 240, 0.012) 100%);
+    backdrop-filter: blur(20px) saturate(1.15);
+    -webkit-backdrop-filter: blur(20px) saturate(1.15);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
+      0 24px 60px -28px rgba(0, 0, 0, 0.55);
+  }
+
+  .raised {
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: linear-gradient(160deg, rgba(255, 250, 240, 0.045), rgba(255, 250, 240, 0.018));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .hairline { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+
+  .label { @apply text-micro uppercase text-dim; }
+
+  .kbd {
+    @apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-xs
+           px-1 font-mono text-[10px] text-dim;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* Gradient headline ink. Ember → candlelight. The accent, used with restraint. */
+  .ember-text {
+    background: linear-gradient(100deg, #ffb27a 0%, #ff7a3d 45%, #ffc46b 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-

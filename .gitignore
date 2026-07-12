@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+.env
+
+# Node — the frontend is PRE-BUILT into src/sbomguard/static/ui/, so a clone needs
+# neither Node nor node_modules to run or demo the project.
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+
+# Runtime artifacts
+artifacts/
+reports/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ── Deliberately COMMITTED, despite looking like build output ───────────────────
+#   src/sbomguard/static/ui/   the compiled dashboard. Committed on purpose: the
+#                              project must run with no Node install and no CDN.
+#   data/official/            the real SG sample data, so the evaluation and the
+#                              data-defect proof are reproducible from a clean clone.
+#   data/sample_data/         our reconstruction — the control that shows the engine
+#                              scores 5/5 on internally-consistent data.

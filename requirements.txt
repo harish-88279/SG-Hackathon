@@ -1,0 +1,24 @@
+# SBOMGuard — dependencies
+#
+# Everything here is free and open source. There are NO paid services anywhere in this
+# project, and no API key is required to run any part of it.
+#
+#   Live CVE enrichment  ->  OSV.dev       free, NO API KEY AT ALL, no signup
+#   LLM narratives       ->  Groq/Gemini   free tier, no credit card    (OPTIONAL)
+#   LLM narratives       ->  none needed   the built-in template engine works offline
+
+# --- core ---
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9      # SBOM file upload
+pydantic>=2.0
+
+# --- analysis ---
+networkx>=3.0                # the dependency graph — the load-bearing wall
+scikit-learn>=1.3            # risk classifier + K-means clustering
+numpy>=1.24
+
+# --- tests ---
+pytest>=7.4
+
+# The front end uses Cytoscape.js and Chart.js from a CDN. No build step, no npm.

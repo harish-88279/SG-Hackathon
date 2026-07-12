@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SBOMGuard — Software Supply Chain Risk Scorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">SG</div>
+    <div>
+      <h1>SBOMGuard</h1>
+      <p class="tag">Software Supply Chain Risk Scorer &middot; PB-10</p>
+    </div>
+  </div>
+  <div class="header-stats" id="headerStats"></div>
+</header>
+
+<nav>
+  <button class="tab active" data-tab="war-room">War Room</button>
+  <button class="tab" data-tab="queue">Priority Queue</button>
+  <button class="tab" data-tab="graph">Dependency Graph</button>
+  <button class="tab" data-tab="playbook">Remediation Playbook</button>
+  <button class="tab" data-tab="intel">AI Intelligence</button>
+  <button class="tab" data-tab="compliance">Compliance</button>
+  <button class="tab" data-tab="gate">CI/CD Gate</button>
+  <button class="tab" data-tab="upload">Upload SBOM</button>
+  <button class="tab" data-tab="proof">Proof</button>
+</nav>
+
+<main>
+
+<!-- ================================================================= WAR ROOM -->
+<section id="war-room" class="panel active">
+
+  <div class="hero">
+    <div class="hero-text">
+      <h2>A critical CVE just dropped. Which of our applications are affected?</h2>
+      <p>
+        In December 2021 this question took most organisations <strong>four days</strong> to
+        answer &mdash; not because Log4Shell was hard to understand, but because nobody knew
+        what was actually in their software. Here it is answered by graph reachability, in
+        milliseconds, <em>including through transitive dependencies that appear in no manifest
+        anyone has ever read.</em>
+      </p>
+    </div>
+    <div class="hero-search">
+      <input type="text" id="cveInput" placeholder="CVE-2021-44228" autocomplete="off"
+             spellcheck="false">
+      <button id="cveGo">Find blast radius</button>
+      <div class="quick">
+        <span>Try:</span>
+        <a href="#" class="chip" data-cve="CVE-2021-44228">CVE-2021-44228 <em>Log4Shell</em></a>
+        <a href="#" class="chip" data-cve="CVE-2017-5638">CVE-2017-5638 <em>Equifax</em></a>
+        <a href="#" class="chip" data-cve="CVE-2024-99001">CVE-2024-99001 <em>no patch</em></a>
+      </div>
+    </div>
+  </div>
+
+  <div id="cveResult"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Application risk ranking</h3>
+      <p class="sub">Scored by the <em>worst reachable component</em>, not by an average.
+         Averaging is how a CVSS-10 hides behind 49 clean libraries.</p>
+      <div id="appRanking" class="app-list"></div>
+    </div>
+    <div class="card">
+      <h3>Risk composition</h3>
+      <p class="sub">What kind of risk are we actually carrying?</p>
+      <canvas id="riskDonut" height="200"></canvas>
+      <div id="riskLegend" class="legend"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================= QUEUE -->
+<section id="queue" class="panel">
+  <div class="card">
+    <h3>The priority queue</h3>
+    <p class="sub">
+      Two numbers, deliberately. <strong>Flaw</strong> is how bad the vulnerability is in the
+      abstract &mdash; comparable to CVSS. <strong>Priority</strong> is how bad it is
+      <em>for us</em>: is the vulnerable function even reachable, is there an exploit in the
+      wild, is the app internet-facing, does it touch cardholder data. Sorting by CVSS sends
+      an engineer to patch an unreachable 9.8 in a dev tool while a weaponised 7.5 sits in
+      the payments path.
+    </p>
+    <div class="filters">
+      <select id="filterApp"><option value="">All applications</option></select>
+      <select id="filterType">
+        <option value="">All risk types</option>
+        <option value="vulnerable_dependency">Direct vulnerability</option>
+        <option value="transitive_vulnerability">Transitive vulnerability</option>
+        <option value="license_conflict">License conflict</option>
+        <option value="unmaintained">Unmaintained</option>
+      </select>
+      <select id="filterBand">
+        <option value="">All bands</option>
+        <option value="CRITICAL">Critical</option>
+        <option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option>
+        <option value="LOW">Low</option>
+      </select>
+      <a class="btn-ghost" href="/api/export/csv">Export CSV</a>
+    </div>
+    <div id="queueTable"></div>
+  </div>
+</section>
+
+<!-- ================================================================= GRAPH -->
+<section id="graph" class="panel">
+  <div class="card">
+    <h3>Dependency graph</h3>
+    <p class="sub">
+      Applications and every library they reach. The red path is how a vulnerability that
+      nobody chose gets into production. Click any node for detail.
+    </p>
+    <div class="filters">
+      <select id="graphApp"></select>
+      <input type="text" id="graphCve" placeholder="Highlight a CVE, e.g. CVE-2021-44228">
+      <button id="graphGo" class="btn-ghost">Highlight</button>
+      <span class="graph-key">
+        <i class="k-app"></i>app
+        <i class="k-crit"></i>critical
+        <i class="k-high"></i>high
+        <i class="k-med"></i>medium
+        <i class="k-clean"></i>clean
+      </span>
+    </div>
+    <div id="cy"></div>
+    <div id="nodeDetail" class="node-detail"></div>
+  </div>
+</section>
+
+<!-- ================================================================= PLAYBOOK -->
+<section id="playbook" class="panel">
+  <div class="card">
+    <h3>Remediation playbook</h3>
+    <p class="sub" id="playbookSummary"></p>
+    <div id="playbookList"></div>
+  </div>
+</section>
+
+<!-- ================================================================= INTEL -->
+<section id="intel" class="panel">
+  <div class="grid-2">
+    <div class="card">
+      <h3>Risk archetypes</h3>
+      <p class="sub">265 findings are not 265 problems. They are a handful of recurring
+         patterns &mdash; and each one is a single campaign with a single owner.</p>
+      <div id="clusterList"></div>
+    </div>
+    <div class="card">
+      <h3>ML early-warning</h3>
+      <p class="sub">
+        The classifier never sees the CVE table. It learns the <em>profile</em> of a
+        component that gets breached &mdash; old, unmaintained, buried deep, sitting in an
+        exposed app. Where the rules see nothing and the model sees danger, you have a
+        Log4j in November 2021.
+      </p>
+      <div id="modelReport"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Cross-application leverage</h3>
+    <p class="sub">Fix by leverage, not by application. Patching the same library ten times
+       in ten repos is ten times the work for the same outcome.</p>
+    <div id="correlationList"></div>
+  </div>
+</section>
+
+<!-- ================================================================= COMPLIANCE -->
+<section id="compliance" class="panel">
+  <div class="card">
+    <h3>Compliance posture</h3>
+    <p class="sub">Every control carries its <em>evidence</em>, not just a verdict &mdash;
+       which is what an auditor actually asks for.</p>
+    <div id="complianceList"></div>
+  </div>
+</section>
+
+<!-- ================================================================= GATE -->
+<section id="gate" class="panel">
+  <div class="card">
+    <h3>CI/CD policy gate</h3>
+    <p class="sub">
+      Everything else here <em>reports</em> on risk. Reports do not stop risk being merged.
+      This returns a UNIX exit code, so it can fail a build. Log4Shell entered those
+      codebases not because nobody had a scanner, but because nothing in the pipeline had
+      the authority to say no.
+    </p>
+    <div class="filters">
+      <select id="policySelect">
+        <option value="permissive">permissive &mdash; blocks only active exploits</option>
+        <option value="default" selected>default &mdash; balanced</option>
+        <option value="strict">strict &mdash; low tolerance</option>
+        <option value="pci">pci &mdash; cardholder-data scope</option>
+      </select>
+      <button id="gateRun">Run gate</button>
+    </div>
+    <div id="gateResult"></div>
+    <details class="ci-snippet">
+      <summary>GitHub Actions integration</summary>
+      <pre id="ciSnippet"></pre>
+    </details>
+  </div>
+</section>
+
+<!-- ================================================================= UPLOAD -->
+<section id="upload" class="panel">
+  <div class="card">
+    <h3>Upload an SBOM</h3>
+    <p class="sub">
+      Accepts our native CSV <strong>and real CycloneDX / SPDX JSON</strong> &mdash; the
+      formats <code>syft</code>, <code>cdxgen</code> and Trivy actually emit. Transitive
+      depth is recovered from the SBOM's own dependency graph, not guessed from a flat
+      component list.
+    </p>
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".json,.csv,.xml">
+      <p>Drop an SBOM here, or click to choose a file</p>
+      <small>CycloneDX JSON &middot; SPDX JSON &middot; CSV</small>
+    </div>
+    <div id="uploadResult"></div>
+  </div>
+</section>
+
+<!-- ================================================================= PROOF -->
+<section id="proof" class="panel">
+  <div class="card">
+    <h3>Proof</h3>
+    <p class="sub">
+      Measured against the ground-truth labels, using the evaluation harness in
+      <code>eval/self_evaluate.py</code>. Every number below is reproducible with one
+      command.
+    </p>
+    <button id="runEval">Run the evaluation</button>
+    <pre id="evalOutput"></pre>
+  </div>
+</section>
+
+</main>
+
+<div id="modal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close">&times;</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
