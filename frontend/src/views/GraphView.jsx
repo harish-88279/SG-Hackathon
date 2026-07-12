@@ -1,302 +1,384 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { sev, cx, Note } from '../lib.jsx'
-import { Panel, Field, Btn, Sev, Skeleton } from '../components/ui.jsx'
+import { sev, cx, RISK_LABEL, Note } from '../lib.jsx'
+import { Panel, Field, Btn, Sev, Skeleton, Blank } from '../components/ui.jsx'
 
 /**
- * The orbital graph.
+ * The dependency tree.
  *
- * A left-to-right tree is the obvious way to draw a dependency graph, and it is the wrong
- * one: it makes depth look like *distance along a page*, which is meaningless, and it
- * spreads 500 nodes into a smear nobody can read.
+ * The first version of this drew the estate as concentric orbits, on the theory that depth
+ * ought to be radius. It was a nice theory. In practice it produced five hundred unlabelled
+ * dots on a circle: you could see that something was wrong and never once see WHAT, because
+ * a ring gives a label nowhere to live. A picture you cannot read is not a picture.
  *
- * So we draw it as ORBITS. The application sits at the centre. Ring one is code somebody
- * on the team actually chose. Every ring beyond it arrived uninvited. Now depth is
- * literally RADIUS — and the single most important fact about a supply-chain flaw, that it
- * is *far from anything you decided*, becomes something you can see from across a room.
+ * So: columns. Depth is the x-axis, one column per hop. The application is the only thing in
+ * column zero. Column one is code somebody on this team actually chose. Everything right of
+ * that arrived uninvited, and the further right it sits, the fewer people knew it was there
+ * at all. Labels now sit beside their node, horizontally, always on -- which is the entire
+ * reason to prefer this layout to a prettier one.
  *
- * Two further decisions do the real work:
+ * Three decisions do the real work:
  *
- *   THE HOT ARC. Within each ring, nodes are ordered by severity rather than by name. The
- *   dangerous ones therefore collect into a contiguous burning arc instead of being
- *   sprinkled evenly around the circle. A uniform sprinkle of red reads as "everything is
- *   a bit bad" — which is how a security dashboard teaches people to ignore it. An arc
- *   reads as "look HERE".
+ *   IT DOES NOT DRAW EVERYTHING. Five hundred nodes is not a visualisation, it is a texture.
+ *   The default view keeps only components that carry risk, plus the hops required to reach
+ *   them -- because those hops ARE the answer to "how did this get in". Everything clean is
+ *   one click away and, deliberately, not the first thing you see.
  *
- *   THE TRACE. The searched CVE is pulled clear of its ring, lit, and its infection path
- *   back to the centre is drawn through every hop that carried it. That line is the whole
- *   argument of the product, drawn in one stroke.
+ *   IT IS A TREE, NOT A HAIRBALL. We take a spanning tree from the application, so every
+ *   component has exactly one drawn route home and the picture stays readable. The routes we
+ *   dropped are not hidden -- they come back as faint dashed arcs, because a library
+ *   reachable two ways must be fixed two ways, and concealing that is how a "patched"
+ *   dependency quietly stays vulnerable.
+ *
+ *   THE TRACE. The searched CVE lights its path back to the application through every hop
+ *   that carried it. That single red line is the whole argument of the product.
  */
-const RING_GAP = 118
-const NODE_R = 5.5
+
+const COL_W = 236
+const ROW = 26
+const PAD = { x: 40, y: 30 }
+const LABEL_W = 200
+
+const RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, MINIMAL: 4, NONE: 5 }
+const rank = (b) => (RANK[b] === undefined ? 5 : RANK[b])
+const isRisky = (b) => rank(b) <= RANK.LOW
+const clip = (s, n = 24) => (!s ? '' : s.length > n ? s.slice(0, n - 1) + '…' : s)
+const push = (m, k, v) => { const a = m.get(k); if (a) a.push(v); else m.set(k, [v]) }
 
 export default function GraphView({ summary, cve }) {
   const [appId, setAppId] = useState(summary.applications[0]?.app_id)
   const [hi, setHi] = useState(cve || summary.featured_cves?.[0]?.cve_id || '')
+  const [showClean, setShowClean] = useState(false)
   const [data, setData] = useState(null)
   const [sel, setSel] = useState(null)
+  const [hover, setHover] = useState(null)
 
-  // viewport
   const [view, setView] = useState({ x: 0, y: 0, k: 1 })
   const drag = useRef(null)
-  const svgRef = useRef(null)
 
   const load = async (highlight = hi) => {
-    setData(null); setSel(null)
+    setData(null); setSel(null); setHover(null)
     const q = { app_id: appId }
-    if (highlight?.trim()) q.highlight_cve = highlight.trim()
+    if (highlight && highlight.trim()) q.highlight_cve = highlight.trim()
     setData(await api.graph(q))
     setView({ x: 0, y: 0, k: 1 })
   }
   useEffect(() => { load() }, [appId])
 
-  /* ── layout ─────────────────────────────────────────────────────────────── */
-  const layout = useMemo(() => {
+  /* -- layout: spanning tree from the app, tidy y, x = depth -------------- */
+  const L = useMemo(() => {
     if (!data) return null
+    const appNode = data.nodes.find((n) => n.data.kind === 'application')
+    if (!appNode) return null
 
-    const app = data.nodes.find((n) => n.data.kind === 'application')
-    const libs = data.nodes.filter((n) => n.data.kind === 'library')
-    if (!app) return null
+    const N = new Map(data.nodes.map((n) => [n.data.id, n.data]))
+    const out = new Map()
+    for (const e of data.edges) {
+      if (N.has(e.data.source) && N.has(e.data.target)) push(out, e.data.source, e.data.target)
+    }
 
-    const RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, MINIMAL: 4, SUPPRESSED: 5 }
-    const pos = new Map()
-    pos.set(app.data.id, { x: 0, y: 0, ...app.data })
-
-    const rings = new Map()
-    libs.forEach((n) => {
-      const d = Math.max(1, Math.min(n.data.depth || 1, 5))
-      if (!rings.has(d)) rings.set(d, [])
-      rings.get(d).push(n)
-    })
-
-    const depths = [...rings.keys()].sort((a, b) => a - b)
-    depths.forEach((d) => {
-      const ns = rings.get(d)
-      // THE HOT ARC — severity first, then score. Danger clumps; it does not sprinkle.
-      ns.sort((a, b) =>
-        (RANK[a.data.risk_band] ?? 9) - (RANK[b.data.risk_band] ?? 9) ||
-        (b.data.risk_score || 0) - (a.data.risk_score || 0)
-      )
-      const r = RING_GAP * d
-      // start the arc at ~11 o'clock so the hot side reads top-right
-      const start = -Math.PI * 0.62
-      ns.forEach((n, i) => {
-        const t = start + (i / ns.length) * Math.PI * 2
-        pos.set(n.data.id, {
-          x: Math.cos(t) * r, y: Math.sin(t) * r, ring: d, angle: t, ...n.data,
-        })
-      })
-    })
-
-    // the traced node is lifted clear of its ring so the path is legible
-    const hot = libs.filter((n) => n.data.highlighted).map((n) => n.data.id)
-    hot.forEach((id) => {
-      const p = pos.get(id)
-      if (!p) return
-      const r = RING_GAP * (p.ring || 1) + 96
-      pos.set(id, { ...p, x: Math.cos(p.angle) * r, y: Math.sin(p.angle) * r, lifted: true })
-    })
-
-    const edges = data.edges
-      .map((e) => ({ s: pos.get(e.data.source), t: pos.get(e.data.target) }))
-      .filter((e) => e.s && e.t)
-
-    // the infection path: every edge that lies on a route to a traced node
-    const parent = new Map()
-    data.edges.forEach((e) => parent.set(e.data.target, e.data.source))
-    const traced = new Set()
-    hot.forEach((id) => {
-      let cur = id
-      for (let i = 0; i < 12 && parent.has(cur); i++) {
-        traced.add(`${parent.get(cur)}->${cur}`)
-        cur = parent.get(cur)
+    const root = appNode.id !== undefined ? appNode.data.id : appNode.data.id
+    const parent = new Map([[root, null]])
+    const depth = new Map([[root, 0]])
+    const kids = new Map()
+    const extra = []
+    const q = [root]
+    while (q.length) {
+      const u = q.shift()
+      for (const v of out.get(u) || []) {
+        if (!parent.has(v)) {
+          parent.set(v, u); depth.set(v, depth.get(u) + 1); push(kids, u, v); q.push(v)
+        } else if (parent.get(v) !== u) {
+          extra.push([u, v])
+        }
       }
-    })
+    }
 
-    const maxR = RING_GAP * (depths[depths.length - 1] || 1) + 140
-    return { pos, edges, traced, hot, app: pos.get(app.data.id), depths, maxR }
-  }, [data])
+    // Keep a node if it carries risk, or if it is on the route to something that does.
+    // That route is the story.
+    const keep = new Set([root])
+    if (showClean) {
+      for (const id of parent.keys()) keep.add(id)
+    } else {
+      for (const [id, d] of N) {
+        if (!parent.has(id)) continue
+        if (d.kind === 'library' && (isRisky(d.risk_band) || d.highlighted)) {
+          for (let c = id; c != null && !keep.has(c); c = parent.get(c)) keep.add(c)
+        }
+      }
+    }
 
-  /* ── interaction ────────────────────────────────────────────────────────── */
+    const byWorst = (a, b) => {
+      const A = N.get(a), B = N.get(b)
+      const r = rank(A.risk_band) - rank(B.risk_band); if (r) return r
+      const s = (B.risk_score || 0) - (A.risk_score || 0); if (s) return s
+      return (A.library || '').localeCompare(B.library || '')
+    }
+
+    const Y = new Map()
+    let cursor = 0
+    const place = (n) => {
+      const ch = (kids.get(n) || []).filter((c) => keep.has(c)).sort(byWorst)
+      if (!ch.length) { Y.set(n, cursor); cursor += 1; return Y.get(n) }
+      const ys = ch.map(place)
+      const y = (ys[0] + ys[ys.length - 1]) / 2
+      Y.set(n, y); return y
+    }
+    place(root)
+
+    const pos = (id) => ({ x: PAD.x + depth.get(id) * COL_W, y: PAD.y + Y.get(id) * ROW })
+
+    const nodes = [...keep].map((id) => ({ id, d: N.get(id), depth: depth.get(id), ...pos(id) }))
+    const links = [...keep]
+      .filter((id) => parent.get(id) != null && keep.has(parent.get(id)))
+      .map((id) => ({ id, from: pos(parent.get(id)), to: pos(id), d: N.get(id) }))
+    const dia = extra
+      .filter(([u, v]) => keep.has(u) && keep.has(v))
+      .map(([u, v]) => ({ key: u + '|' + v, from: pos(u), to: pos(v) }))
+
+    const chain = (id) => { const p = []; for (let c = id; c != null; c = parent.get(c)) p.push(c); return p }
+    const traced = new Set()
+    for (const n of nodes) if (n.d.highlighted) for (const c of chain(n.id)) traced.add(c)
+
+    const maxD = nodes.reduce((m, n) => Math.max(m, n.depth), 0)
+    const counts = { total: 0, risky: 0, hidden: 0 }
+    for (const n of nodes) {
+      if (n.d.kind !== 'library') continue
+      counts.total += 1
+      if (isRisky(n.d.risk_band)) counts.risky += 1
+      if (n.depth > 1) counts.hidden += 1
+    }
+    const allLibs = [...N.values()].filter((d) => d.kind === 'library').length
+
+    return {
+      nodes, links, dia, chain, traced, counts, maxD,
+      h: PAD.y * 2 + cursor * ROW,
+      app: appNode.data,
+      dropped: showClean ? 0 : allLibs - counts.total,
+    }
+  }, [data, showClean])
+
+  const lit = useMemo(() => (hover && L ? new Set(L.chain(hover)) : null), [hover, L])
+
   const onWheel = (e) => {
     e.preventDefault()
-    setView((v) => ({ ...v, k: Math.min(4, Math.max(0.35, v.k * (e.deltaY < 0 ? 1.12 : 0.89))) }))
+    setView((v) => ({ ...v, k: Math.min(2.4, Math.max(0.3, v.k * (e.deltaY < 0 ? 1.12 : 0.89))) }))
   }
-  const onDown = (e) => { drag.current = { x: e.clientX, y: e.clientY, ...view } }
-  const onMove = (e) => {
+  const down = (e) => { drag.current = { ...view, mx: e.clientX, my: e.clientY } }
+  const move = (e) => {
     if (!drag.current) return
     const d = drag.current
-    setView({ ...d, x: d.x0 ?? d.x, y: d.y0 ?? d.y, ...{ x: d.x + (e.clientX - d.x) * 0, y: 0 } })
+    setView({ k: d.k, x: d.x + (e.clientX - d.mx), y: d.y + (e.clientY - d.my) })
   }
-  // simpler, correct pan
-  const onMove2 = (e) => {
-    if (!drag.current) return
-    const d = drag.current
-    setView((v) => ({ ...v, x: d.px + (e.clientX - d.x) / v.k, y: d.py + (e.clientY - d.y) / v.k }))
-  }
-  const onDown2 = (e) => { drag.current = { x: e.clientX, y: e.clientY, px: view.x, py: view.y } }
-  const onUp = () => { drag.current = null }
+  const up = () => { drag.current = null }
 
-  const VB = 900
-  const half = VB / 2
+  const edge = (a, b) => {
+    const mx = (a.x + b.x) / 2
+    return `M${a.x},${a.y} C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}`
+  }
 
   return (
-    <Panel
-      title="Dependency graph"
-      sub="Everything an application reaches — including what nobody chose."
-      actions={
-        <>
-          <Field value={appId} onChange={(e) => setAppId(e.target.value)}>
-            {summary.applications.map((a) => (
-              <option key={a.app_id} value={a.app_id}>{a.app_name}</option>
-            ))}
-          </Field>
-          <input
-            value={hi}
-            onChange={(e) => setHi(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load(hi)}
-            placeholder="Trace a CVE"
-            className="h-8 w-[152px] rounded border border-line bg-raised px-2.5 font-mono text-sm text-muted outline-none transition-colors focus:border-edge focus:text-ink"
-          />
-          <Btn onClick={() => load(hi)}>Trace</Btn>
-        </>
-      }
-    >
-      <Note>
-        The centre is your application. <strong className="font-semibold text-ink">Ring one</strong> is code someone
-        chose; every ring beyond it <strong className="font-semibold text-ink">arrived uninvited</strong>. Danger
-        gathers into the hot arc, and the traced flaw burns at the edge with its infection path already drawn —{' '}
-        <strong className="font-semibold text-ink">that distance from the centre is why nobody found Log4Shell for
-        four days.</strong> Click any node to inspect it.
-      </Note>
-
-      <div className="mt-5 flex flex-wrap items-center gap-5 pb-3 text-xs text-faint">
-        {[['#5a9de8', 'app'], ['#f4485f', 'critical'], ['#f2894a', 'high'],
-          ['#dfb13f', 'medium'], ['#40b98c', 'clean']].map(([c, l]) => (
-          <span key={l} className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: c }} />{l}
-          </span>
-        ))}
-        <span className="ml-auto">scroll to zoom · drag to pan · click a node to inspect</span>
-      </div>
-
-      <div className="relative overflow-hidden rounded-md border border-line bg-canvas">
-        {!data && <div className="p-6"><Skeleton rows={9} /></div>}
-
-        {data && layout && (
-          <>
-            {/* floating stats */}
-            <div className="pointer-events-none absolute left-4 top-4 z-10 flex gap-2">
-              {[[data.stats.library_nodes, 'components'],
-                [data.stats.edges, 'links'],
-                [data.stats.max_depth, 'rings deep']].map(([v, l]) => (
-                <span key={l} className="rounded border border-line bg-surface/85 px-2.5 py-1 text-xs text-dim backdrop-blur">
-                  <b className="tnum font-semibold text-ink">{v}</b> {l}
-                </span>
+    <div className="space-y-4">
+      <Panel
+        title="How it got in"
+        sub="Depth is the x-axis. Column one is code you chose; everything right of it arrived uninvited."
+        flush
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={appId} onChange={(e) => setAppId(e.target.value)}
+              className="h-8 rounded-lg border border-line bg-raised px-2 text-xs text-ink outline-none focus:border-amber/60"
+            >
+              {summary.applications.map((a) => (
+                <option key={a.app_id} value={a.app_id}>{a.name}</option>
+              ))}
+            </select>
+            <Field
+              value={hi} onChange={(e) => setHi(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && load(e.target.value)}
+              placeholder="trace a CVE…" spellCheck={false}
+              className="h-8 w-[168px] font-mono text-xs"
+            />
+            <Btn onClick={() => load()} className="h-8">Trace</Btn>
+            <div className="ml-1 flex rounded-lg border border-line bg-raised p-0.5">
+              {[['At risk', false], ['Everything', true]].map(([lbl, val]) => (
+                <button
+                  key={lbl} onClick={() => setShowClean(val)}
+                  className={cx('rounded-md px-2.5 py-1 text-xs transition-colors',
+                    showClean === val ? 'bg-amber/15 text-amber' : 'text-dim hover:text-ink')}
+                >{lbl}</button>
               ))}
             </div>
+          </div>
+        }
+      >
+        {!data || !L ? <div className="p-6"><Skeleton rows={8} /></div> : (
+          <>
+            {/* these numbers describe THIS PICTURE, not the estate */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
+              <Chip n={L.counts.total} of="components drawn" />
+              <Chip n={L.counts.risky} of="at risk" tone="text-crit" />
+              <Chip n={L.counts.hidden} of="nobody chose" tone="text-amber" />
+              <Chip n={L.maxD} of={L.maxD === 1 ? 'hop deep' : 'hops deep'} />
+              {L.dropped > 0 && (
+                <span className="ml-auto text-xs text-faint">
+                  {L.dropped} clean components hidden{' · '}
+                  <button onClick={() => setShowClean(true)}
+                    className="text-dim underline decoration-dotted underline-offset-2 hover:text-ink">
+                    show everything
+                  </button>
+                </span>
+              )}
+            </div>
 
-            <svg
-              ref={svgRef}
-              viewBox={`${-half} ${-half} ${VB} ${VB}`}
-              className="h-[600px] w-full cursor-grab active:cursor-grabbing select-none"
-              onWheel={onWheel}
-              onMouseDown={onDown2}
-              onMouseMove={onMove2}
-              onMouseUp={onUp}
-              onMouseLeave={onUp}
-            >
-              <defs>
-                <radialGradient id="core" cx="50%" cy="50%">
-                  <stop offset="0%" stopColor="#5a9de8" stopOpacity=".22" />
-                  <stop offset="100%" stopColor="#5a9de8" stopOpacity="0" />
-                </radialGradient>
-                <filter id="burn" x="-260%" y="-260%" width="620%" height="620%">
-                  <feGaussianBlur stdDeviation="7" result="b" />
-                  <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-                </filter>
-              </defs>
+            {L.counts.total === 0 ? (
+              <div className="p-8">
+                <Blank>Nothing in this application carries risk. Switch to &ldquo;Everything&rdquo; to see its clean tree.</Blank>
+              </div>
+            ) : (
+              <div
+                className="relative overflow-hidden bg-deep/40"
+                style={{ height: Math.min(880, Math.max(360, L.h + 56)), cursor: drag.current ? 'grabbing' : 'grab' }}
+                onWheel={onWheel} onMouseDown={down} onMouseMove={move}
+                onMouseUp={up} onMouseLeave={() => { up(); setHover(null) }}
+              >
+                {/* the column headers carry the meaning, so they stay put while you pan */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex border-b border-line bg-surface/85 backdrop-blur">
+                  {Array.from({ length: L.maxD + 1 }, (_, d) => (
+                    <div key={d} className="shrink-0 border-r border-line/60 px-3 py-2" style={{ width: COL_W }}>
+                      <span className="label text-[9.5px] text-faint">
+                        {d === 0 ? 'the application' : d === 1 ? 'you chose this' : `hop ${d} · uninvited`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
 
-              <g transform={`scale(${view.k}) translate(${view.x} ${view.y})`}>
-                {/* orbit guides */}
-                {layout.depths.map((d) => (
-                  <circle key={d} cx={0} cy={0} r={RING_GAP * d}
-                          fill="none" stroke="#1e1e23" strokeWidth={1} />
-                ))}
-                <circle cx={0} cy={0} r={92} fill="url(#core)" />
+                <svg className="h-full w-full select-none">
+                  <defs>
+                    <filter id="gglow" x="-140%" y="-140%" width="380%" height="380%">
+                      <feGaussianBlur stdDeviation="4" result="b" />
+                      <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                  </defs>
 
-                {/* edges */}
-                {layout.edges.map((e, i) => {
-                  const key = `${e.s.id}->${e.t.id}`
-                  const hot = layout.traced.has(key)
-                  return (
-                    <line
-                      key={i}
-                      x1={e.s.x} y1={e.s.y} x2={e.t.x} y2={e.t.y}
-                      stroke={hot ? '#f4485f' : '#1e1e23'}
-                      strokeWidth={hot ? 1.4 : 0.6}
-                      strokeOpacity={hot ? 0.85 : 1}
-                    />
-                  )
-                })}
+                  <g transform={`translate(${view.x},${view.y + 36}) scale(${view.k})`}>
+                    {/* the routes the spanning tree could not draw */}
+                    {L.dia.map((e) => (
+                      <path key={e.key} d={edge(e.from, e.to)} fill="none" stroke="#847c6f"
+                        strokeWidth="1" strokeDasharray="2 4" opacity={lit ? 0.05 : 0.18} />
+                    ))}
 
-                {/* nodes */}
-                {[...layout.pos.values()].filter((n) => n.kind === 'library').map((n) => {
-                  const s = sev(n.risk_band)
-                  const clean = n.risk_band === 'MINIMAL'
-                  const r = n.lifted ? 8 : NODE_R + (n.risk_score || 0) / 34
-                  return (
-                    <g key={n.id} onClick={(e) => { e.stopPropagation(); setSel(n) }}
-                       className="cursor-pointer">
-                      <circle
-                        cx={n.x} cy={n.y} r={r}
-                        fill={s.hex}
-                        fillOpacity={clean ? 0.5 : 1}
-                        filter={n.lifted ? 'url(#burn)' : undefined}
-                        stroke={sel?.id === n.id ? '#ededf0' : 'none'}
-                        strokeWidth={1.5}
-                      />
-                      {n.lifted && (
-                        <text x={n.x} y={n.y + 21} textAnchor="middle"
-                              className="fill-crit font-mono" style={{ fontSize: 9, fontWeight: 700 }}>
-                          {n.library}
-                        </text>
-                      )}
-                    </g>
-                  )
-                })}
+                    {L.links.map((e) => {
+                      const on = lit ? lit.has(e.id) : true
+                      const hot = L.traced.size > 1 && L.traced.has(e.id)
+                      return (
+                        <path key={e.id} d={edge(e.from, e.to)} fill="none"
+                          stroke={hot ? '#ff5d5d' : sev(e.d.risk_band).hex}
+                          strokeWidth={hot ? 2 : 1.2}
+                          opacity={on ? (hot ? 0.95 : isRisky(e.d.risk_band) ? 0.5 : 0.2) : 0.05}
+                          filter={hot ? 'url(#gglow)' : undefined} />
+                      )
+                    })}
 
-                {/* the application, at the centre of its own world */}
-                <g>
-                  <rect x={-72} y={-19} width={144} height={38} rx={6}
-                        fill="#0a0a0b" stroke="#5a9de8" strokeWidth={1.4} />
-                  <text x={0} y={5} textAnchor="middle"
-                        className="fill-ink" style={{ fontSize: 12, fontWeight: 600 }}>
-                    {layout.app?.label}
-                  </text>
-                </g>
-              </g>
-            </svg>
+                    {L.nodes.map((n) => {
+                      const on = lit ? lit.has(n.id) : true
+                      if (n.d.kind === 'application') {
+                        const w = Math.max(100, (n.d.label || '').length * 7.2 + 24)
+                        return (
+                          <g key={n.id} opacity={on ? 1 : 0.3}>
+                            <rect x={n.x - 10} y={n.y - 13} rx={7} width={w} height={26}
+                              fill="#1e1b18" stroke="#ff7a3d" strokeWidth="1.2" />
+                            <text x={n.x + 2} y={n.y} dy=".33em" fill="#f2eee7"
+                              style={{ fontSize: 11.5, fontWeight: 600 }}>{n.d.label}</text>
+                          </g>
+                        )
+                      }
+                      const hot = !!n.d.highlighted
+                      const risky = isRisky(n.d.risk_band) || hot
+                      const c = sev(n.d.risk_band).hex
+                      return (
+                        <g key={n.id} opacity={on ? 1 : 0.16} style={{ cursor: 'pointer' }}
+                          onMouseEnter={() => setHover(n.id)}
+                          onClick={(e) => { e.stopPropagation(); setSel(n.d) }}>
+                          {hot && <circle cx={n.x} cy={n.y} r="9" fill={c} opacity=".22" filter="url(#gglow)" />}
+                          <circle cx={n.x} cy={n.y} r={hot ? 5.5 : risky ? 4.5 : 3} fill={c}
+                            stroke={sel && sel.id === n.id ? '#f2eee7' : 'none'} strokeWidth="1.5" />
+                          <text x={n.x + 11} y={n.y} dy=".33em"
+                            style={{ fontSize: 10.5, fontFamily: "'JetBrains Mono Variable', monospace" }}
+                            fill={hot ? '#ff5d5d' : risky ? '#f2eee7' : '#847c6f'}>
+                            {clip(n.d.library)}
+                            <tspan fill="#5a5349">{'  '}{n.d.version}</tspan>
+                          </text>
+                        </g>
+                      )
+                    })}
+                  </g>
+                </svg>
+
+                <div className="pointer-events-none absolute bottom-3 left-4 flex flex-wrap items-center gap-3 text-[10.5px] text-faint">
+                  {[['#ff7a3d', 'app'], ['#ff5d5d', 'critical'], ['#ffa14d', 'high'],
+                    ['#f2c94c', 'medium'], ['#82b4e8', 'low'], ['#5fcf9a', 'clean']].map(([h, l]) => (
+                    <span key={l} className="flex items-center gap-1.5">
+                      <i className="h-1.5 w-1.5 rounded-full" style={{ background: h }} />{l}
+                    </span>
+                  ))}
+                  <span className="flex items-center gap-1.5 border-l border-line pl-3">
+                    <i className="inline-block h-px w-4 border-t border-dashed border-dim" /> reachable two ways
+                  </span>
+                </div>
+                <div className="pointer-events-none absolute bottom-3 right-4 text-[10.5px] text-faint">
+                  scroll to zoom {'·'} drag to pan {'·'} hover to light its route home {'·'} click to inspect
+                </div>
+              </div>
+            )}
           </>
         )}
-      </div>
+      </Panel>
 
-      <div className="mt-4 flex min-h-[20px] items-center text-sm">
-        {!sel && <span className="text-faint">Click any node to inspect it.</span>}
-        {sel && (
-          <span className="flex flex-wrap items-center gap-3">
-            <span className="font-mono text-ink">{sel.library}</span>
-            <span className="font-mono text-faint">{sel.version}</span>
-            <Sev level={sel.risk_band} />
-            <span className="text-dim">
-              {sel.license} · ring {sel.ring} · priority {sel.risk_score}
-            </span>
-            {sel.ring > 1 && (
-              <span className="text-info">arrived uninvited — nobody on the team chose this</span>
-            )}
-          </span>
-        )}
+      {sel && <Inspect d={sel} onClose={() => setSel(null)} />}
+
+      {L && L.traced.size > 1 && (
+        <Note>
+          The red line is the route <span className="font-mono text-ink">{hi}</span> took into{' '}
+          <span className="text-ink">{L.app.label}</span>. Nobody chose the component at the end of it. They chose
+          the one at the start, and everything after that came along for the ride {'—'} which is what a
+          supply-chain vulnerability <em>is</em>, and why an inventory that stops at direct dependencies cannot
+          see one.
+        </Note>
+      )}
+    </div>
+  )
+}
+
+function Chip({ n, of, tone = 'text-ink' }) {
+  return (
+    <span className="rounded-lg border border-line bg-raised/70 px-2.5 py-1 text-xs text-dim">
+      <b className={cx('tnum font-semibold', tone)}>{n}</b> {of}
+    </span>
+  )
+}
+
+function Inspect({ d, onClose }) {
+  return (
+    <Panel
+      title={<span className="font-mono">{d.library} <span className="text-dim">{d.version}</span></span>}
+      sub={d.depth > 1
+        ? `Reached at hop ${d.depth} — nobody chose this directly`
+        : 'A direct dependency — somebody on the team chose this'}
+      actions={<Btn onClick={onClose} className="h-8">Close</Btn>}
+    >
+      <div className="grid gap-5 sm:grid-cols-4">
+        <Cell k="Risk band"><Sev level={d.risk_band} /></Cell>
+        <Cell k="Risk score">
+          <span className="tnum text-lg font-semibold text-ink">{Math.round(d.risk_score || 0)}</span>
+        </Cell>
+        <Cell k="Why"><span className="text-sm text-ink">{RISK_LABEL[d.risk_type] || 'Clean'}</span></Cell>
+        <Cell k="Licence"><span className="font-mono text-sm text-ink">{d.license}</span></Cell>
       </div>
     </Panel>
   )
 }
+
+const Cell = ({ k, children }) => (
+  <div><div className="label mb-1.5">{k}</div>{children}</div>
+)
