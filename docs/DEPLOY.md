@@ -24,18 +24,44 @@ live — against Render's 512MB ceiling. scikit-learn is most of that.
 
 ## Deploy
 
-1. Push the repo to GitHub (`push.bat`).
+Two paths. **Pick one.** The second is fewer moving parts and builds faster, so it is the
+one to use unless you specifically want the container.
+
+### A. Native Python (recommended — no image build)
+
+1. Push to GitHub (`push.bat`).
 2. Sign in at **<https://render.com>** with GitHub. No card.
 3. **New → Web Service** → pick the `SG-Hackathon` repo.
-4. Render reads `render.yaml` and fills everything in. Confirm:
-   - Runtime **Docker**, Plan **Free**, Health check **`/health`**
-5. **Create Web Service.** First build takes 4–6 minutes (it installs scikit-learn).
+4. Render will guess **Language: Python 3**. That is correct. Then set:
 
-Your URL: `https://sbomguard.onrender.com` (Render will tell you the exact one).
+   | Field | Value |
+   |---|---|
+   | **Build Command** | `pip install -r requirements.txt` |
+   | **Start Command** | `PYTHONPATH=src python -m uvicorn sbomguard.api:app --host 0.0.0.0 --port $PORT` |
+   | **Instance Type** | Free |
 
-`autoDeploy` is on, so every `git push` redeploys.
+   Render pre-fills the Start Command with a greyed-out `gunicorn your_application.wsgi`.
+   That is a **placeholder, not a value** — and it would not work anyway: gunicorn is a
+   *WSGI* server and FastAPI is *ASGI*. Replace it with the line above.
 
----
+   Two details in that command are load-bearing. `PYTHONPATH=src` because the package lives
+   at `src/sbomguard`, not at the repo root. And `$PORT` because Render injects the port —
+   hardcode one and the health check never passes.
+
+5. **Create Web Service.** First deploy takes 3–5 minutes (installing scikit-learn).
+
+### B. Docker
+
+Same steps, but on the create page change the **Language** dropdown from *Python 3* to
+**Docker**. The Build and Start Command fields disappear; Render uses the `Dockerfile`.
+
+> **`render.yaml` is only read by Blueprints, not by Web Services.** If you want Render to
+> configure itself from that file, you must use **New → Blueprint** instead of **New → Web
+> Service**. Creating a plain Web Service ignores it entirely — which is exactly why the
+> form asked you for a start command.
+
+Your URL will be `https://sbomguard.onrender.com` (Render tells you the exact one).
+Auto-deploy is on, so every `git push` ships.
 
 ## The one thing that will bite you on demo day
 

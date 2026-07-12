@@ -1,22 +1,28 @@
 # Render blueprint — https://render.com
 #
-# Free tier, no credit card. Render reads this file, builds the Dockerfile, and gives you
-# an HTTPS URL. Nothing else to configure: no database, no secrets, no volumes.
+# IMPORTANT: this file is only read by Render BLUEPRINTS. If you create a plain
+# "Web Service" from the dashboard, Render ignores it and asks you for a build and
+# start command instead. Use  New -> Blueprint  to have it configure itself from here,
+# or follow docs/DEPLOY.md and type the two commands in by hand.
 #
-# The free instance sleeps after 15 minutes of inactivity and takes ~50s to wake. That is
-# the one real cost of "free", and it matters on demo day — see docs/DEPLOY.md for how to
-# keep it warm before you present.
+# Free tier, no credit card. No database, no secrets, no volumes.
+#
+# The free instance sleeps after 15 minutes idle and takes ~50s to wake. That matters on
+# demo day — see docs/DEPLOY.md.
 
 services:
   - type: web
     name: sbomguard
-    runtime: docker
+    runtime: python
     plan: free
     region: oregon
-    dockerfilePath: ./Dockerfile
+    buildCommand: pip install -r requirements.txt
+    # PYTHONPATH=src because the package lives at src/sbomguard, not the repo root.
+    # $PORT because Render injects it — hardcode a port and the health check never passes.
+    # uvicorn, not gunicorn: FastAPI is ASGI and gunicorn alone speaks WSGI.
+    startCommand: PYTHONPATH=src python -m uvicorn sbomguard.api:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      # Render injects PORT itself; the Dockerfile binds ${PORT}. Do not hardcode it.
       - key: PYTHONUNBUFFERED
         value: "1"
