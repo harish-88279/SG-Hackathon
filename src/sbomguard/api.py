@@ -757,21 +757,42 @@ def export_csv():
 
 
 @app.get("/api/eval")
-def evaluation():
-    """Run the self-evaluation and return the metrics. This is our proof."""
+def evaluation(dataset: str = "official"):
+    """
+    Run an evaluation harness live and return its output. Nothing is precomputed.
+
+    Two datasets, and the difference between them IS the finding:
+
+      official   the real SG data. 3/5 — and two of the five are provably
+                 unsatisfiable on it, which the harness proves rather than asserts.
+      synthetic  internally-consistent data. 5/5, same engine, no changes.
+
+    It used to only run the synthetic one and the page claimed "we meet all five",
+    while the rest of the app was analysing the official data at 3/5. That is exactly
+    the kind of quiet flattery this tool exists to catch, so it now defaults to the
+    dataset that is actually loaded.
+    """
     import subprocess
     import sys as _sys
 
-    script = config.PROJECT_ROOT / "eval" / "self_evaluate.py"
+    scripts = {
+        "official": "evaluate_official.py",
+        "synthetic": "self_evaluate.py",
+    }
+    if dataset not in scripts:
+        raise HTTPException(400, f"Unknown dataset '{dataset}'. Use: {list(scripts)}")
+
+    script = config.PROJECT_ROOT / "eval" / scripts[dataset]
     try:
         out = subprocess.run(
             [_sys.executable, str(script)],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=180,
             cwd=str(config.PROJECT_ROOT),
         )
-        return {"output": out.stdout, "passed": out.returncode == 0}
+        return {"dataset": dataset, "output": out.stdout, "passed": out.returncode == 0}
     except Exception as e:  # noqa: BLE001
-        return {"output": f"Evaluation could not be run: {e}", "passed": False}
+        return {"dataset": dataset, "output": f"Evaluation could not be run: {e}",
+                "passed": False}
 
 
 @app.get("/health")

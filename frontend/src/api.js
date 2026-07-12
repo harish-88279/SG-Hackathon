@@ -30,7 +30,7 @@ export const api = {
                                        headers: { 'Content-Type': 'application/json' },
                                        body: JSON.stringify({ policy }),
                                      }),
-  evaluate:     ()               => j('/api/eval'),
+  evaluate:     (dataset)        => j('/api/eval?dataset=' + (dataset || 'official')),
   upload:       (file)           => {
                                      const fd = new FormData()
                                      fd.append('file', file)
